@@ -120,28 +120,35 @@ class MarginalExplainer(object):
         if feature_indices is None:
             feature_indices = np.arange(X.shape[-1])
         
-        main_effects = np.zeros(X.shape)
+        main_effects = np.zeros((X.shape[0], len(feature_indices)))
         
         data_iterable = enumerate(X)
         if verbose:
             data_iterable = enumerate(tqdm(X))
         
         for j, target_example in data_iterable:
-            for i in range(0, self.nsamples, batch_size):
-                for feature_index in feature_indices:
-                    background_samples = self._sample_background(min(self.nsamples, i + batch_size) - i, target_example, feature_index)
-                    sample_vector = self._construct_sample_vector(target_example, background_samples, feature_index)
+            for k, feature_index in enumerate(feature_indices):
+                for i in range(0, self.nsamples, batch_size):
+                    number_to_draw     = min(self.nsamples, i + batch_size) - i
+                    background_samples = self._sample_background(number_to_draw, target_example, feature_index)
+                    sample_vector      = self._construct_sample_vector(target_example, background_samples, feature_index)
                     
                     if self.representation == 'mobius':
-                        difference = np.sum(self.model(sample_vector)) - np.sum(self.model(background_samples))
+                        difference    = np.sum(self.model(sample_vector)) - np.sum(self.model(background_samples))
                     elif self.representation == 'comobius':
-                        difference = np.sum(self.model(target_example)) - np.sum(self.model(sample_vector))
+                        #I've hacked a quick solution here: multiply the baseline v(N) by the number of samples
+                        #drawn for v(N\{i}). This technically works to put them on the same magnitude,
+                        #but is numerically unstable. It would be better to actually perform the mean
+                        #calculations over the sampling and keep v(N) as a stable quantity.
+                        difference    = number_to_draw * np.sum(self.model(np.expand_dims(target_example, axis=0))) - \
+                                        np.sum(self.model(sample_vector))
                     else:
-                        mobius_diff = np.sum(self.model(sample_vector)) - np.sum(self.model(background_samples))
-                        comobius_diff = np.sum(self.model(target_example)) - np.sum(self.model(sample_vector))
-                        difference = (mobius_diff + comobius_diff) * 0.5
+                        mobius_diff   = np.sum(self.model(sample_vector[0])) - np.sum(self.model(background_samples))
+                        comobius_diff = number_to_draw * np.sum(self.model(np.expand_dims(target_example, axis=0))) - \
+                                        np.sum(self.model(sample_vector[1]))
+                        difference    = (mobius_diff + comobius_diff) * 0.5
                     
-                    main_effects[j, feature_index] += difference
+                    main_effects[j, k] += difference
         
         main_effects /= self.nsamples
         return main_effects
