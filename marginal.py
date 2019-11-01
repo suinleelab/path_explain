@@ -67,7 +67,11 @@ class MarginalExplainer(object):
             #Right now the way I'm doing this is by sorting examples with respect to their
             #feature-wise difference to the target feature. This is slow and should be improved,
             #but it was easy to code so here we are.
-            abs_diff_from_feature = np.abs(target_example[feature_index] - sample_indices[:, feature_index])
+            abs_diff_from_feature = np.abs(target_example[tuple([np.newaxis] + list(feature_index))] - \
+                                           self.data[tuple([slice(None)] + list(feature_index))])
+            #Note: this slice(None) business is used to index the sample_indices
+            #tensor using the feature_index tensor, which represents a list
+            #the same length as the number of dimensions the data.
             abs_diff_ranking      = np.argsort(abs_diff_from_feature)[::-1]
             return self.data[abs_diff_from_ranking[number_to_draw]]
 
@@ -87,12 +91,15 @@ class MarginalExplainer(object):
             `average`, a tuple containing (x_S, x_{N\S}).
         '''
         mobius_vector = background_samples.copy()
-        mobius_vector[:, feature_index] = target_example[feature_index]
+        mobius_vector[tuple([slice(None)] + list(feature_index))] = \
+            target_example[tuple(feature_index)]
 
         comobius_vector = target_example.copy()
         comobius_vector = np.expand_dims(comobius_vector, axis=0)
-        comobius_vector = np.tile(comobius_vector, (background_samples.shape[0], 1))
-        comobius_vector[:, feature_index] = background_samples[:, feature_index]
+        comobius_vector = np.tile(comobius_vector, [background_samples.shape[0]] + [1] * len(feature_index))
+        
+        comobius_vector[tuple([slice(None)] + list(feature_index))] = \
+            background_samples[tuple([slice(None)] + list(feature_index))]
             
         if self.representation == 'mobius':
             return mobius_vector
@@ -107,9 +114,16 @@ class MarginalExplainer(object):
         
         Args:
             X: A data matrix. The samples you want to compute
-               the main effects for.
+               the main effects for. The code here assumes that the
+               data is an array of shape [num_samples, ...] where
+               ... represent the dimensions of the input.
             feature_indices: The indices of features whose main effects
                              you want to compute. Defaults to all features.
+                             If your data X has multiple dimensions (e.g. 
+                             [width, height, channels] for images), this should
+                             be a 2D array where the second dimension is
+                             equal to the number of dimensions in the data 
+                             (something like [#indices, 3] for color images).
             batch_size: The batch size to use while calling the model.
             verbose:    Whether or not to log progress while doing computation.
             
@@ -118,16 +132,21 @@ class MarginalExplainer(object):
             of each feature.
         '''
         if feature_indices is None:
-            feature_indices = np.arange(X.shape[-1])
+            #This one-liner computes an array of size 
+            #[np.prod(X.shape), len(X.shape)] where the
+            #rows represent all possible indices into X
+            sample_shape = X.shape[1:]
+            feature_indices = np.swapaxes(np.reshape(np.indices(sample_shape), 
+                                          (len(sample_shape), np.prod(sample_shape))), 0, 1)
         
-        main_effects = np.zeros((X.shape[0], len(feature_indices)))
+        main_effects = np.full(X.shape, np.nan)
         
         data_iterable = enumerate(X)
         if verbose:
             data_iterable = enumerate(tqdm(X))
         
         for j, target_example in data_iterable:
-            for k, feature_index in enumerate(feature_indices):
+            for feature_index in feature_indices:
                 for i in range(0, self.nsamples, batch_size):
                     number_to_draw     = min(self.nsamples, i + batch_size) - i
                     background_samples = self._sample_background(number_to_draw, target_example, feature_index)
@@ -148,7 +167,7 @@ class MarginalExplainer(object):
                                         np.sum(self.model(sample_vector[1]))
                         difference    = (mobius_diff + comobius_diff) * 0.5
                     
-                    main_effects[j, k] += difference
+                    main_effects[tuple([j] + list(feature_index))] = difference
         
         main_effects /= self.nsamples
         return main_effects
