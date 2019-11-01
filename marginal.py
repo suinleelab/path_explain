@@ -16,6 +16,8 @@ class MarginalExplainer(object):
             model: A function or callable that can be called on input data to produce output.
             data:  A numpy array of input data to sample background references from.
                    Typically this represents the same matrix the model was trained on.
+                   If len(data) < nsamples, then we will only draw len(data) samples. This
+                   behavior is useful if you want a constant reference, e.g. a black image.
             nsamples: The number of samples to draw from the data when computing the expectation.
             feature_dependence: One of `independent`, `dependent`. This parameter
                                 controls how the explainer samples background samples.
@@ -28,7 +30,7 @@ class MarginalExplainer(object):
         '''
         self.model    = model
         self.data     = data
-        self.nsamples = nsamples
+        self.nsamples = min(nsamples, len(data))
         self.feature_dependence = feature_dependence
         self.representation     = representation
         
