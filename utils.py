@@ -28,6 +28,7 @@ def normalize(im_batch, _range=None, _domain=None):
     return norm_batch
 
 def set_up_environment(mem_frac=None):
+    tf.enable_eager_execution()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:

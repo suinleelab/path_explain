@@ -70,6 +70,23 @@ def get_data():
 #     y_test  = tf.keras.utils.to_categorical(y_test,  10)
     return x_train, y_train, x_test, y_test
 
+def save_attributions(model, samples, background, input_shape, subdir='train'):
+    os.makedirs('data/{}/{}/'.format(FLAGS.dataset, subdir), exist_ok=True)
+    
+    primal_explainer = MarginalExplainer(model, background, 
+                                         nsamples=200, representation='mobius')
+    primal_effects = primal_explainer.explain(samples, verbose=True)
+    
+    grad_explainer = shap.GradientExplainer(model, background)
+    shap_values = grad_explainer.shap_values(samples, nsamples=200, ranked_outputs=1)
+    shap_values = np.reshape(shap_values[0], (FLAGS.num_shap_samples, *input_shape))
+    
+    interaction_effects = shap_values - primal_effects
+    
+    np.save('data/{}/{}/primal_effects_{}.npy'.format(FLAGS.dataset,      subdir, FLAGS.background), primal_effects)
+    np.save('data/{}/{}/shap_values_{}.npy'.format(FLAGS.dataset,         subdir, FLAGS.background), shap_values)
+    np.save('data/{}/{}/interaction_effects_{}.npy'.format(FLAGS.dataset, subdir, FLAGS.background), interaction_effects)
+
 def train(argv=None):
     input_shape = (28, 28, 1)
     if FLAGS.dataset == 'color_mnist':
@@ -88,27 +105,14 @@ def train(argv=None):
               validation_data=(x_test, y_test))
     
     if FLAGS.background == 'black':
-        background = np.zeros((1, *input_shape))
+        background = np.zeros((1, *input_shape)).astype(np.float32)
     elif FLAGS.background == 'train_dist':
-        background = x_train[:200]
+        background = x_train
     
-    primal_explainer = MarginalExplainer(model, background, 
-                                         nsamples=200, representation='mobius')
-    primal_effects = primal_explainer.explain(x_test[:FLAGS.num_shap_samples], verbose=True)
+    print(tf.executing_eagerly())
+    save_attributions(model, x_test[:FLAGS.num_shap_samples],  background, input_shape, subdir='test')
+    save_attributions(model, x_train[:FLAGS.num_shap_samples], background, input_shape, subdir='train')
     
-    model_func = lambda x: model(x.reshape(x.shape[0], *input_shape).astype(np.float32)).numpy()
-    kernel_explainer = shap.KernelExplainer(model_func, 
-                                            np.reshape(background, (background.shape[0], -1)))
-    shap_values = kernel_explainer.shap_values(x_test[:FLAGS.num_shap_samples].reshape(
-                                               FLAGS.num_shap_samples, -1))
-    shap_values = np.reshape(shap_values, (num_shap_samples, *input_shape))
-    
-    interaction_effects = shap_values - primal_effects
-    
-    os.makedirs('data/{}/'.format(FLAGS.dataset), exist_ok=True)
-    np.save('data/{}/primal_effects.npy'.format(FLAGS.dataset), primal_effects)
-    np.save('data/{}/shap_values.npy'.format(FLAGS.dataset),    shap_values)
-    np.save('data/{}/interaction_effects.npy'.format(FLAGS.dataset), interaction_effects)
     
 if __name__ == '__main__':
     utils.set_up_environment()
