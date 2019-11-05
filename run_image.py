@@ -20,8 +20,9 @@ flags.DEFINE_integer('num_shap_samples', 10, 'Number of test-set examples to eva
 flags.DEFINE_boolean('train_only', False, 'Set to true to only train the model')
 
 def build_model(input_shape=(28, 28, 1)):
+    weight_decay = 0.001
     model = tf.keras.Sequential()
-    model.add(tf.keras.layers.Input(shape=(28, 28, 3), dtype=tf.float32))
+    model.add(tf.keras.layers.Input(shape=input_shape, dtype=tf.float32))
     model.add(tf.keras.layers.Conv2D(20, (5, 5), padding='same', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
     model.add(tf.keras.layers.Activation('relu'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
