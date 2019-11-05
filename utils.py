@@ -27,8 +27,18 @@ def normalize(im_batch, _range=None, _domain=None):
         norm_batch = norm_batch * (amax - amin) + amin
     return norm_batch
 
+def batch_standardize(x, multi_class=True):
+    if multi_class:
+        mean_per_row = np.mean(x, axis=(1, 2, 3, 4), keepdims=True)
+        std_per_row  = np.std(x,  axis=(1, 2, 3, 4), keepdims=True)
+        return (x - mean_per_row) / std_per_row
+    else:
+        mean_per_row = np.mean(x, axis=(1, 2, 3), keepdims=True)
+        std_per_row  = np.std(x,  axis=(1, 2, 3), keepdims=True)
+        return (x - mean_per_row) / std_per_row
+
 def set_up_environment(mem_frac=None):
-    tf.enable_eager_execution()
+#     tf.enable_eager_execution()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:

@@ -13,29 +13,28 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('dataset', 'mnist', 'One of `mnist`, `color_mnist`')
 flags.DEFINE_integer('batch_size', 50, 'Batch size for training and evaluation')
-flags.DEFINE_integer('num_epochs', 20, 'Number of epochs to train for')
-flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate to use while training')
+flags.DEFINE_integer('num_epochs', 10, 'Number of epochs to train for')
+flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate to use while training')
 flags.DEFINE_string('background', 'black', 'One of `black`, `train_dist`')
 flags.DEFINE_integer('num_shap_samples', 10, 'Number of test-set examples to evaluate attributions on')
+flags.DEFINE_boolean('train_only', False, 'Set to true to only train the model')
 
 def build_model(input_shape=(28, 28, 1)):
-    model = tf.keras.models.Sequential()
-    
-    model.add(tf.keras.layers.Input(shape=input_shape, dtype=tf.float32))
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Input(shape=(28, 28, 3), dtype=tf.float32))
+    model.add(tf.keras.layers.Conv2D(20, (5, 5), padding='same', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
     model.add(tf.keras.layers.Activation('relu'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
 
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(50, (5, 5), padding='same', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
     model.add(tf.keras.layers.Activation('relu'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
 
     model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(1024))
+    model.add(tf.keras.layers.Dense(526, kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
     model.add(tf.keras.layers.Activation('relu'))
 
-    model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(10))
+    model.add(tf.keras.layers.Dense(10, kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
     model.add(tf.keras.layers.Activation('softmax'))
     return model
 
@@ -70,12 +69,12 @@ def get_data():
 #     y_test  = tf.keras.utils.to_categorical(y_test,  10)
     return x_train, y_train, x_test, y_test
 
-def save_attributions(model, samples, background, input_shape, subdir='train'):
+def save_attributions(model, samples, labels, background, input_shape, subdir='train'):
     os.makedirs('data/{}/{}/'.format(FLAGS.dataset, subdir), exist_ok=True)
 
     primal_explainer = MarginalExplainer(model, background, 
                                          nsamples=200, representation='mobius')
-    primal_effects = primal_explainer.explain(samples, verbose=True)
+    primal_effects = primal_explainer.explain(samples, verbose=True, index_outputs=True, labels=labels)
     
     model_func = lambda x: model(np.reshape(x, (x.shape[0], *input_shape)).astype(np.float32)).numpy()
     
@@ -88,10 +87,12 @@ def save_attributions(model, samples, background, input_shape, subdir='train'):
                                                          (background.shape[0], -1)))
     shap_values = sample_explainer.shap_values(np.reshape(samples, 
                                                           (FLAGS.num_shap_samples, -1)))
+    shap_values = np.stack(shap_values, axis=0)
+    shap_values = shap_values[labels, np.arange(shap_values.shape[1]), :]
     
 #     grad_explainer = shap.GradientExplainer(model, background)
 #     shap_values = grad_explainer.shap_values(samples, nsamples=200, ranked_outputs=1)
-    shap_values = np.reshape(shap_values[0], (FLAGS.num_shap_samples, *input_shape))
+    shap_values = np.reshape(shap_values, (FLAGS.num_shap_samples, *input_shape))
     
     interaction_effects = shap_values - primal_effects
     
@@ -110,7 +111,7 @@ def train(argv=None):
     try:
         model = tf.keras.models.load_model('models/{}_model.h5'.format(FLAGS.dataset))
     except OSError:
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
         model.compile(optimizer=optimizer,
                       loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                       metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
@@ -125,8 +126,11 @@ def train(argv=None):
     elif FLAGS.background == 'train_dist':
         background = x_train
     
-    save_attributions(model, x_test[:FLAGS.num_shap_samples],  background, input_shape, subdir='test')
-    save_attributions(model, x_train[:FLAGS.num_shap_samples], background, input_shape, subdir='train')
+    if not FLAGS.train_only:
+        save_attributions(model, x_test[:FLAGS.num_shap_samples],  y_test[:FLAGS.num_shap_samples].astype(int), 
+                          background, input_shape, subdir='test')
+        save_attributions(model, x_train[:FLAGS.num_shap_samples], y_train[:FLAGS.num_shap_samples].astype(int),
+                          background, input_shape, subdir='train')
     
     
 if __name__ == '__main__':

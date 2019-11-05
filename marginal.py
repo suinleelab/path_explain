@@ -178,8 +178,8 @@ class MarginalExplainer(object):
                     sample_vector      = self._construct_sample_vector(target_example, background_samples, feature_index)
                     
                     if self.representation == 'mobius':
-                        sample_vector_out  = self.model(sample_vector).numpy()
-                        background_out     = self.model(background_samples).numpy()
+                        sample_vector_out  = self.model(sample_vector)
+                        background_out     = self.model(background_samples)
                         if is_multi_class:
                             sample_vector_out = sample_vector_out[:, labels[j]]
                             background_out    = background_out[:, labels[j]]
@@ -190,8 +190,8 @@ class MarginalExplainer(object):
                         #drawn for v(N\{i}). This technically works to put them on the same magnitude,
                         #but is numerically unstable. It would be better to actually perform the mean
                         #calculations over the sampling and keep v(N) as a stable quantity.
-                        target_vector_out = self.model(np.expand_dims(target_example, axis=0)).numpy()
-                        sample_vector_out = self.model(sample_vector).numpy()
+                        target_vector_out = self.model(np.expand_dims(target_example, axis=0))
+                        sample_vector_out = self.model(sample_vector)
                         if is_multi_class:
                             target_vector_out = target_vector_out[:, labels[j]]
                             sample_vector_out    = sample_vector_out[:, labels[j]]
@@ -199,10 +199,10 @@ class MarginalExplainer(object):
                         difference    = number_to_draw * np.sum(target_vector_out) - \
                                         np.sum(sample_vector_out)
                     else:
-                        sample_vector_out   = self.model(sample_vector[0]).numpy()
-                        background_out      = self.model(background_samples).numpy()
-                        target_vector_out   = self.model(np.expand_dims(target_example, axis=0)).numpy()
-                        cosample_vector_out = self.model(sample_vector[1]).numpy()
+                        sample_vector_out   = self.model(sample_vector[0])
+                        background_out      = self.model(background_samples)
+                        target_vector_out   = self.model(np.expand_dims(target_example, axis=0))
+                        cosample_vector_out = self.model(sample_vector[1])
                         if is_multi_class:
                             sample_vector_out   = sample_vector_out[:, labels[j]]
                             background_out      = background_out[:,    labels[j]]
@@ -214,7 +214,10 @@ class MarginalExplainer(object):
                                         np.sum(cosample_vector_out)
                         difference    = (mobius_diff + comobius_diff) * 0.5
 
-                    main_effects[tuple([j] + list(feature_index))] = difference
+                    # Since we can't add anything to np.nan, we have to first check
+                    if np.isnan(main_effects[tuple([j] + list(feature_index))]):
+                        main_effects[tuple([j] + list(feature_index))] = 0.0
+                    main_effects[tuple([j] + list(feature_index))] += difference
         
         main_effects /= self.nsamples
         return main_effects
