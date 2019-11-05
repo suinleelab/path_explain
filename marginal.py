@@ -108,9 +108,10 @@ class MarginalExplainer(object):
         elif self.representation == 'comobius':
             return comobius_vector
         else:
-            return (mobius_vector, comobius_vector)
-    
-    def explain(self, X, feature_indices=None, batch_size=50, verbose=False):
+            return (mobius_vector, comobius_vector)    
+        
+    def explain(self, X, feature_indices=None, batch_size=50, verbose=False, 
+                index_outputs=False, labels=None):
         '''
         Computes the main effects of the model on data X. 
         
@@ -128,10 +129,20 @@ class MarginalExplainer(object):
                              (something like [#indices, 3] for color images).
             batch_size: The batch size to use while calling the model.
             verbose:    Whether or not to log progress while doing computation.
+            index_true_class: Whether or not to index the output of the model
+                              by output_indices. This parameter is 
+                              used if you have a multi-class problem, in which
+                              case you have to pass which output class you
+                              want to index into.
+            labels:           An integer array of shape (len(X),) representing
+                              which output classes to index into when
+                              doing the computation. If set to None,
+                              defaults to the maximum output for each class.
             
         Returns:
-            A matrix of shape [num_samples, len(feature_indices)]. The main effects
-            of each feature.
+            A list of length len(output_indices). Each entry in the list
+            is a matrix of shape [num_samples, len(feature_indices)], representing
+            the main effects of each feature with respect to the indicated output class.
         '''
         if feature_indices is None:
             #This one-liner computes an array of size 
@@ -140,6 +151,18 @@ class MarginalExplainer(object):
             sample_shape = X.shape[1:]
             feature_indices = np.swapaxes(np.reshape(np.indices(sample_shape), 
                                           (len(sample_shape), np.prod(sample_shape))), 0, 1)
+        test_output = self.model(X[0:1])
+        if len(test_output.shape) > 1 and test_output.shape[-1] > 1:
+            is_multi_class = True
+            if labels is None:
+                labels = []
+                for i in range(0, len(X), batch_size):
+                    labels_batch = self.model(X[i:min(i + batch_size, len(X))])
+                    labels.append(labels_batch)
+                labels = np.concatenate(labels, axis=0)
+                labels = np.argmax(labels, axis=-1)
+        else:
+            is_multi_class = False
         
         main_effects = np.full(X.shape, np.nan)
         
@@ -155,20 +178,42 @@ class MarginalExplainer(object):
                     sample_vector      = self._construct_sample_vector(target_example, background_samples, feature_index)
                     
                     if self.representation == 'mobius':
-                        difference    = np.sum(self.model(sample_vector)) - np.sum(self.model(background_samples))
+                        sample_vector_out  = self.model(sample_vector).numpy()
+                        background_out     = self.model(background_samples).numpy()
+                        if is_multi_class:
+                            sample_vector_out = sample_vector_out[:, labels[j]]
+                            background_out    = background_out[:, labels[j]]
+                        
+                        difference    = np.sum(sample_vector_out) - np.sum(background_out)
                     elif self.representation == 'comobius':
                         #I've hacked a quick solution here: multiply the baseline v(N) by the number of samples
                         #drawn for v(N\{i}). This technically works to put them on the same magnitude,
                         #but is numerically unstable. It would be better to actually perform the mean
                         #calculations over the sampling and keep v(N) as a stable quantity.
-                        difference    = number_to_draw * np.sum(self.model(np.expand_dims(target_example, axis=0))) - \
-                                        np.sum(self.model(sample_vector))
+                        target_vector_out = self.model(np.expand_dims(target_example, axis=0)).numpy()
+                        sample_vector_out = self.model(sample_vector).numpy()
+                        if is_multi_class:
+                            target_vector_out = target_vector_out[:, labels[j]]
+                            sample_vector_out    = sample_vector_out[:, labels[j]]
+                        
+                        difference    = number_to_draw * np.sum(target_vector_out) - \
+                                        np.sum(sample_vector_out)
                     else:
-                        mobius_diff   = np.sum(self.model(sample_vector[0])) - np.sum(self.model(background_samples))
-                        comobius_diff = number_to_draw * np.sum(self.model(np.expand_dims(target_example, axis=0))) - \
-                                        np.sum(self.model(sample_vector[1]))
+                        sample_vector_out   = self.model(sample_vector[0]).numpy()
+                        background_out      = self.model(background_samples).numpy()
+                        target_vector_out   = self.model(np.expand_dims(target_example, axis=0)).numpy()
+                        cosample_vector_out = self.model(sample_vector[1]).numpy()
+                        if is_multi_class:
+                            sample_vector_out   = sample_vector_out[:, labels[j]]
+                            background_out      = background_out[:,    labels[j]]
+                            target_vector_out   = target_vector_out[:, labels[j]]
+                            cosample_vector_out = cosample_vector_out[:, labels[j]]
+                            
+                        mobius_diff   = np.sum(sample_vector_out) - np.sum(background_out)
+                        comobius_diff = number_to_draw * np.sum(target_vector_out) - \
+                                        np.sum(cosample_vector_out)
                         difference    = (mobius_diff + comobius_diff) * 0.5
-                    
+
                     main_effects[tuple([j] + list(feature_index))] = difference
         
         main_effects /= self.nsamples

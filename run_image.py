@@ -2,10 +2,10 @@ import os
 import tensorflow as tf
 import numpy as np
 import shap
-from marginal import MarginalExplainer
+from interaction_effects.marginal import MarginalExplainer
 from colour import Color
 
-import utils
+from interaction_effects import utils
 from absl import app
 from absl import flags
 
@@ -13,10 +13,10 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('dataset', 'mnist', 'One of `mnist`, `color_mnist`')
 flags.DEFINE_integer('batch_size', 50, 'Batch size for training and evaluation')
-flags.DEFINE_integer('num_epochs', 5, 'Number of epochs to train for')
+flags.DEFINE_integer('num_epochs', 20, 'Number of epochs to train for')
 flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate to use while training')
 flags.DEFINE_string('background', 'black', 'One of `black`, `train_dist`')
-flags.DEFINE_integer('num_shap_samples', 100, 'Number of test-set examples to evaluate attributions on')
+flags.DEFINE_integer('num_shap_samples', 10, 'Number of test-set examples to evaluate attributions on')
 
 def build_model(input_shape=(28, 28, 1)):
     model = tf.keras.models.Sequential()
@@ -72,13 +72,25 @@ def get_data():
 
 def save_attributions(model, samples, background, input_shape, subdir='train'):
     os.makedirs('data/{}/{}/'.format(FLAGS.dataset, subdir), exist_ok=True)
-    
+
     primal_explainer = MarginalExplainer(model, background, 
                                          nsamples=200, representation='mobius')
     primal_effects = primal_explainer.explain(samples, verbose=True)
     
-    grad_explainer = shap.GradientExplainer(model, background)
-    shap_values = grad_explainer.shap_values(samples, nsamples=200, ranked_outputs=1)
+    model_func = lambda x: model(np.reshape(x, (x.shape[0], *input_shape)).astype(np.float32)).numpy()
+    
+    if FLAGS.background == 'train_dist':
+        shap_indices = np.random.choice(background.shape[0], size=200, replace=False)
+        background = background[shap_indices]
+        
+    sample_explainer = shap.SamplingExplainer(model_func,
+                                              np.reshape(background, 
+                                                         (background.shape[0], -1)))
+    shap_values = sample_explainer.shap_values(np.reshape(samples, 
+                                                          (FLAGS.num_shap_samples, -1)))
+    
+#     grad_explainer = shap.GradientExplainer(model, background)
+#     shap_values = grad_explainer.shap_values(samples, nsamples=200, ranked_outputs=1)
     shap_values = np.reshape(shap_values[0], (FLAGS.num_shap_samples, *input_shape))
     
     interaction_effects = shap_values - primal_effects
@@ -95,21 +107,24 @@ def train(argv=None):
     model = build_model(input_shape)
     x_train, y_train, x_test, y_test = get_data()
     
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
-    model.compile(optimizer=optimizer,
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                  metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
-    model.fit(x_train, y_train, 
-              batch_size=FLAGS.batch_size, 
-              epochs=FLAGS.num_epochs, 
-              validation_data=(x_test, y_test))
+    try:
+        model = tf.keras.models.load_model('models/{}_model.h5'.format(FLAGS.dataset))
+    except OSError:
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+        model.compile(optimizer=optimizer,
+                      loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                      metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+        model.fit(x_train, y_train, 
+                  batch_size=FLAGS.batch_size, 
+                  epochs=FLAGS.num_epochs, 
+                  validation_data=(x_test, y_test))
+        model.save('models/{}_model.h5'.format(FLAGS.dataset))
     
     if FLAGS.background == 'black':
         background = np.zeros((1, *input_shape)).astype(np.float32)
     elif FLAGS.background == 'train_dist':
         background = x_train
     
-    print(tf.executing_eagerly())
     save_attributions(model, x_test[:FLAGS.num_shap_samples],  background, input_shape, subdir='test')
     save_attributions(model, x_train[:FLAGS.num_shap_samples], background, input_shape, subdir='train')
     
