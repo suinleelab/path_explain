@@ -38,7 +38,7 @@ def batch_standardize(x, multi_class=True):
         return (x - mean_per_row) / std_per_row
 
 def set_up_environment(mem_frac=None):
-#     tf.enable_eager_execution()
+    tf.enable_eager_execution()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:

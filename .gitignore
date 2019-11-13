@@ -1,3 +1,7 @@
+*data/
+*.csv
+*.npy
+heart.csv
 data/
 MANIFEST
 build
