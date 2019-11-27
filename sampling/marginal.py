@@ -7,11 +7,11 @@ class MarginalExplainer(object):
     A class for computing the conditional expectation of a function
     (model) given knowledge of certain features
     '''
-    
+
     def __init__(self, model, data, nsamples, feature_dependence='independent', representation='mobius'):
         '''
         Initializes the class object.
-        
+
         Args:
             model: A function or callable that can be called on input data to produce output.
             data:  A numpy array of input data to sample background references from.
@@ -33,27 +33,27 @@ class MarginalExplainer(object):
         self.nsamples = min(nsamples, len(data))
         self.feature_dependence = feature_dependence
         self.representation     = representation
-        
+
         if len(self.data) < self.nsamples:
             raise ValueError('Requested more samples than amount of background data provided!')
-        
+
         if self.feature_dependence not in ['independent', 'dependent']:
-            raise ValueError('''Unrecognized value `{}` for argument feature_dependence. 
+            raise ValueError('''Unrecognized value `{}` for argument feature_dependence.
             Must be one of `independent`, `dependent`.'''.format(self.feature_dependence))
-        
+
         if self.feature_dependence == 'dependent':
             warnings.warn('You have specified dependent feature sampling. Note that this ' + \
                           'is current performed by sorting the data for every sample and ' + \
                           'every feature, which is quite slow.')
-        
+
         if self.representation not in ['mobius', 'comobius', 'average']:
-            raise ValueError('''Unrecognized value `{}` for argument representation. 
+            raise ValueError('''Unrecognized value `{}` for argument representation.
             Must be one of `mobius`, `comobius`, `average`.'''.format(self.representation))
-    
+
     def _sample_background(self, number_to_draw, target_example, feature_index):
         '''
         An internal function to sample data from a background distribution.
-        
+
         Args:
             number_to_draw: The number of samples to draw.
             target_example: The current example x.
@@ -80,16 +80,16 @@ class MarginalExplainer(object):
     def _construct_sample_vector(self, target_example, background_samples, feature_index):
         '''
         An internal function to compute the vector x_S or x_{N\S}, or both.
-        
+
         Args:
             target_example: The current example x.
             background_samples: A set of input vectors that represent
                                 the background distribution.
             feature_index: Which feature (or set of features) represent the
                            target set
-        
+
         Returns:
-            The target vector x_S or x_{N\S}, or in the case of 
+            The target vector x_S or x_{N\S}, or in the case of
             `average`, a tuple containing (x_S, x_{N\S}).
         '''
         mobius_vector = background_samples.copy()
@@ -99,22 +99,22 @@ class MarginalExplainer(object):
         comobius_vector = target_example.copy()
         comobius_vector = np.expand_dims(comobius_vector, axis=0)
         comobius_vector = np.tile(comobius_vector, [background_samples.shape[0]] + [1] * len(feature_index))
-        
+
         comobius_vector[tuple([slice(None)] + list(feature_index))] = \
             background_samples[tuple([slice(None)] + list(feature_index))]
-            
+
         if self.representation == 'mobius':
             return mobius_vector
         elif self.representation == 'comobius':
             return comobius_vector
         else:
-            return (mobius_vector, comobius_vector)    
-        
-    def explain(self, X, feature_indices=None, batch_size=50, verbose=False, 
+            return (mobius_vector, comobius_vector)
+
+    def explain(self, X, feature_indices=None, batch_size=50, verbose=False,
                 index_outputs=False, labels=None):
         '''
-        Computes the main effects of the model on data X. 
-        
+        Computes the main effects of the model on data X.
+
         Args:
             X: A data matrix. The samples you want to compute
                the main effects for. The code here assumes that the
@@ -122,15 +122,15 @@ class MarginalExplainer(object):
                ... represent the dimensions of the input.
             feature_indices: The indices of features whose main effects
                              you want to compute. Defaults to all features.
-                             If your data X has multiple dimensions (e.g. 
+                             If your data X has multiple dimensions (e.g.
                              [width, height, channels] for images), this should
                              be a 2D array where the second dimension is
-                             equal to the number of dimensions in the data 
+                             equal to the number of dimensions in the data
                              (something like [#indices, 3] for color images).
             batch_size: The batch size to use while calling the model.
             verbose:    Whether or not to log progress while doing computation.
             index_true_class: Whether or not to index the output of the model
-                              by output_indices. This parameter is 
+                              by output_indices. This parameter is
                               used if you have a multi-class problem, in which
                               case you have to pass which output class you
                               want to index into.
@@ -138,18 +138,18 @@ class MarginalExplainer(object):
                               which output classes to index into when
                               doing the computation. If set to None,
                               defaults to the maximum output for each class.
-            
+
         Returns:
             A list of length len(output_indices). Each entry in the list
             is a matrix of shape [num_samples, len(feature_indices)], representing
             the main effects of each feature with respect to the indicated output class.
         '''
         if feature_indices is None:
-            #This one-liner computes an array of size 
+            #This one-liner computes an array of size
             #[np.prod(X.shape), len(X.shape)] where the
             #rows represent all possible indices into X
             sample_shape = X.shape[1:]
-            feature_indices = np.swapaxes(np.reshape(np.indices(sample_shape), 
+            feature_indices = np.swapaxes(np.reshape(np.indices(sample_shape),
                                           (len(sample_shape), np.prod(sample_shape))), 0, 1)
         test_output = self.model(X[0:1])
         if len(test_output.shape) > 1 and test_output.shape[-1] > 1:
@@ -163,27 +163,27 @@ class MarginalExplainer(object):
                 labels = np.argmax(labels, axis=-1)
         else:
             is_multi_class = False
-        
+
         main_effects = np.full(X.shape, np.nan)
-        
+
         data_iterable = enumerate(X)
         if verbose:
             data_iterable = enumerate(tqdm(X))
-        
+
         for j, target_example in data_iterable:
             for feature_index in feature_indices:
                 for i in range(0, self.nsamples, batch_size):
                     number_to_draw     = min(self.nsamples, i + batch_size) - i
                     background_samples = self._sample_background(number_to_draw, target_example, feature_index)
                     sample_vector      = self._construct_sample_vector(target_example, background_samples, feature_index)
-                    
+
                     if self.representation == 'mobius':
                         sample_vector_out  = self.model(sample_vector)
                         background_out     = self.model(background_samples)
                         if is_multi_class:
                             sample_vector_out = sample_vector_out[:, labels[j]]
                             background_out    = background_out[:, labels[j]]
-                        
+
                         difference    = np.sum(sample_vector_out) - np.sum(background_out)
                     elif self.representation == 'comobius':
                         #I've hacked a quick solution here: multiply the baseline v(N) by the number of samples
@@ -195,7 +195,7 @@ class MarginalExplainer(object):
                         if is_multi_class:
                             target_vector_out = target_vector_out[:, labels[j]]
                             sample_vector_out    = sample_vector_out[:, labels[j]]
-                        
+
                         difference    = number_to_draw * np.sum(target_vector_out) - \
                                         np.sum(sample_vector_out)
                     else:
@@ -208,7 +208,7 @@ class MarginalExplainer(object):
                             background_out      = background_out[:,    labels[j]]
                             target_vector_out   = target_vector_out[:, labels[j]]
                             cosample_vector_out = cosample_vector_out[:, labels[j]]
-                            
+
                         mobius_diff   = np.sum(sample_vector_out) - np.sum(background_out)
                         comobius_diff = number_to_draw * np.sum(target_vector_out) - \
                                         np.sum(cosample_vector_out)
@@ -218,6 +218,6 @@ class MarginalExplainer(object):
                     if np.isnan(main_effects[tuple([j] + list(feature_index))]):
                         main_effects[tuple([j] + list(feature_index))] = 0.0
                     main_effects[tuple([j] + list(feature_index))] += difference
-        
+
         main_effects /= self.nsamples
         return main_effects
