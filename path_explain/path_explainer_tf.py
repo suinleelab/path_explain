@@ -47,7 +47,7 @@ class PathExplainerTF(Explainer):
             the sampled interpolation constants
         """
         if use_expectation:
-            replace = baseline.shape[0] > number_to_draw
+            replace = baseline.shape[0] < number_to_draw
             sample_indices = np.random.choice(baseline.shape[0],
                                               size=number_to_draw,
                                               replace=replace)
@@ -107,17 +107,18 @@ class PathExplainerTF(Explainer):
             reps[0] = number_to_draw
             batch_input = tf.convert_to_tensor(np.tile(current_input, reps))
 
-            with tf.GradientTape() as tape:
-                tape.watch(batch_input)
+            batch_difference = batch_input - batch_baseline
+            batch_interpolated = batch_alphas * batch_input + \
+                                 (1.0 - batch_alphas) * batch_baseline
 
-                batch_difference = batch_input - batch_baseline
-                batch_interpolated = batch_alphas * batch_input + \
-                                     (1.0 - batch_alphas) * batch_baseline
+            with tf.GradientTape() as tape:
+                tape.watch(batch_interpolated)
+
                 batch_predictions = self.model(batch_interpolated)
                 if output_index is not None:
                     batch_predictions = batch_predictions[:, output_index]
 
-            batch_gradients = tape.gradient(batch_predictions, batch_input)
+            batch_gradients = tape.gradient(batch_predictions, batch_interpolated)
             batch_attributions = batch_gradients * batch_difference
             attribution_array.append(batch_attributions)
         attribution_array = np.concatenate(attribution_array, axis=0)
