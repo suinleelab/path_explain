@@ -53,7 +53,7 @@ class PathExplainerTF(Explainer):
                                               replace=replace)
             sampled_baseline = baseline[sample_indices]
         else:
-            reps = np.ones(len(baseline.shape))
+            reps = np.ones(len(baseline.shape)).astype(int)
             reps[0] = number_to_draw
             sampled_baseline = np.tile(baseline, reps)
         return sampled_baseline
@@ -68,7 +68,7 @@ class PathExplainerTF(Explainer):
                 expected gradients-style sampling
         """
         if use_expectation:
-            return np.random.uniform(low=0.0, high=0.0, size=num_samples)
+            return np.random.uniform(low=0.0, high=1.0, size=num_samples)
         else:
             return np.linspace(start=0.0, stop=1.0, num=num_samples, endpoint=True)
 
@@ -91,6 +91,8 @@ class PathExplainerTF(Explainer):
             output_index: Whether or not to index into a given class
         """
         current_input = np.expand_dims(current_input, axis=0)
+        current_alphas = tf.reshape(current_alphas, (num_samples,) + \
+                                    (1,) * (len(current_input.shape) - 1))
 
         attribution_array = []
         for j in range(0, num_samples, batch_size):
@@ -101,9 +103,9 @@ class PathExplainerTF(Explainer):
                                                    use_expectation)
             batch_alphas = current_alphas[j:min(j + batch_size, num_samples)]
 
-            reps = np.ones(len(current_input.shape))
+            reps = np.ones(len(current_input.shape)).astype(int)
             reps[0] = number_to_draw
-            batch_input = np.tile(current_input, reps)
+            batch_input = tf.convert_to_tensor(np.tile(current_input, reps))
 
             with tf.GradientTape() as tape:
                 tape.watch(batch_input)
