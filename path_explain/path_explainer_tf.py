@@ -297,6 +297,10 @@ class PathExplainerTF(Explainer):
             if interaction_index is not None:
                 #In this case, the hessian is the same size as the input because we
                 #indexed into a particular gradient
+                batch_differences_secondary = batch_difference[tuple([slice(None)] + interaction_index)]
+                for _ in range(len(current_input.shape) - 1):
+                    batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
+                                                                 axis=-1)
                 batch_hessian = second_order_tape.gradient(batch_gradients, batch_interpolated)
             else:
                 #In this case, the hessian matrix duplicates the dimensionality of the
@@ -316,10 +320,19 @@ class PathExplainerTF(Explainer):
                 batch_hessian = batch_hessian[tuple(hessian_index_array)]
 
                 #Now we adjust the batch_difference tensor to
-                #be ready to broadcast
+                #be ready to broadcast. We use a broadcasting trick
+                #to get the pairwise-differences
+
+                #Note: in eager mode, this copies the value,
+                #not the reference
+                batch_differences_secondary = batch_difference
+
                 for _ in range(len(current_input.shape) - 1):
                     batch_difference = tf.expand_dims(batch_difference, axis=-1)
+                    batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
+                                                                 axis=1)
 
+            batch_difference = batch_difference * batch_differences_secondary
             batch_attributions = batch_hessian * batch_difference
             attribution_array.append(batch_attributions)
         attribution_array = np.concatenate(attribution_array, axis=0)
