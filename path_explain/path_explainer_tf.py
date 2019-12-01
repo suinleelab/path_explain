@@ -297,7 +297,8 @@ class PathExplainerTF(Explainer):
             if interaction_index is not None:
                 #In this case, the hessian is the same size as the input because we
                 #indexed into a particular gradient
-                batch_differences_secondary = batch_difference[tuple([slice(None)] + interaction_index)]
+                batch_differences_secondary = batch_difference[tuple([slice(None)] + \
+                                                                     interaction_index)]
                 for _ in range(len(current_input.shape) - 1):
                     batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
                                                                  axis=-1)
