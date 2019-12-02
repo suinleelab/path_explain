@@ -129,7 +129,8 @@ class PathExplainerTF(Explainer):
     def _init_array(self,
                     inputs,
                     output_indices,
-                    interaction_index=None):
+                    interaction_index=None,
+                    as_interactions=False):
         """
         Internal helper function to get an
         array of the proper shape.
@@ -142,7 +143,7 @@ class PathExplainerTF(Explainer):
         shape_tuple = inputs.shape
         num_classes = test_output.shape[-1]
 
-        if interaction_index is None:
+        if as_interactions and interaction_index is None:
             shape_tuple = (inputs.shape[0], ) + \
                           2 * (inputs.shape[1:])
 
@@ -344,7 +345,7 @@ class PathExplainerTF(Explainer):
                      batch_size=50, num_samples=100,
                      use_expectation=True, output_indices=None,
                      verbose=False, explain_index=None,
-                     interation_index=None, interaction_index=None):
+                     interaction_index=None):
         """
         A function to compute path interactions (attributions of
         attributions) on the given inputs.
@@ -382,7 +383,8 @@ class PathExplainerTF(Explainer):
         """
         interactions, is_multi_output, num_classes = self._init_array(inputs,
                                                                       output_indices,
-                                                                      interaction_index)
+                                                                      interaction_index,
+                                                                      True)
 
         input_iterable = enumerate(inputs)
         if verbose:
