@@ -57,7 +57,7 @@ def scatter_plot(attributions,
         y_name: attributions[:, feature_index]
     })
 
-    if color_by:
+    if color_by is not None:
         color_name = 'Value of {}'.format(feature_names[color_by])
         data_df[color_name] = feature_values[:, color_by]
 
@@ -66,7 +66,7 @@ def scatter_plot(attributions,
         y=alt.Y(y_name + ':Q')
     )
 
-    if color_by:
+    if color_by is not None:
         chart = chart.encode(
             color=alt.Color(color_name + ':Q', scale=alt.Scale(scheme='goldgreen'))
         )
