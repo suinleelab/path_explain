@@ -58,19 +58,45 @@ class PathExplainerTF(Explainer):
             sampled_baseline = np.tile(baseline, reps)
         return sampled_baseline
 
-    def _sample_alphas(self, num_samples, use_expectation):
+    def _sample_alphas(self, num_samples, use_expectation, use_product=False):
         """
         An internal function to sample the interpolation constant.
 
         Args:
             num_samples: Number of alphas to draw
             use_expectation: Whether or not to use
-                expected gradients-style sampling
+                             expected gradients-style sampling
+            use_product: Set to true to sample from
+                         the product distribution
         """
         if use_expectation:
-            return np.random.uniform(low=0.0, high=1.0, size=num_samples)
+            if use_product:
+                alpha = np.random.uniform(low=0.0, high=1.0, size=num_samples)
+                beta = np.random.uniform(low=0.0, high=1.0, size=num_samples)
+                return alpha, beta
+            else:
+                return np.random.uniform(low=0.0, high=1.0, size=num_samples)
         else:
-            return np.linspace(start=0.0, stop=1.0, num=num_samples, endpoint=True)
+            if use_product:
+                sqrt_samples = np.ceil(np.sqrt(num_samples)).astype(int)
+                spaced_points = np.linspace(start=0.0, stop=1.0, num=sqrt_samples, endpoint=True)
+
+                num_drawn = sqrt_samples * sqrt_samples
+                slice_indices = np.round(np.linspace(start=0.0,
+                                                     stop=num_drawn-1,
+                                                     num=num_samples,
+                                                     endpoint=True)).astype(int)
+
+                ones_map = np.ones(sqrt_samples)
+                beta = np.outer(spaced_points, ones_map).flatten()
+                beta = beta[slice_indices]
+
+                alpha = np.outer(ones_map, spaced_points).flatten()
+                alpha = alpha[slice_indices]
+
+                return alpha, beta
+            else:
+                return np.linspace(start=0.0, stop=1.0, num=num_samples, endpoint=True)
 
     def _single_attribution(self, current_input, current_baseline,
                             current_alphas, num_samples, batch_size,
@@ -236,6 +262,33 @@ class PathExplainerTF(Explainer):
                 attributions[i] = current_attributions
         return attributions
 
+    def _get_diagonal_derivatives(self, batch_hessian, batch_gradients,
+                                  interaction_index):
+        """
+        A helper function to get the diagonal derivatives
+        for the interaction values.
+
+        Args:
+            batch_hessian: from _single_interaction
+            batch_gradient: from _single_interaction
+            interaction_index: from _single_interaction
+        """
+        if interaction_index is not None:
+            diagonal_derivative = np.zeros(shape=batch_hessian.shape.as_list())
+            diagonal_derivative[tuple([slice(None)] + interaction_index)] = \
+                    batch_gradients
+        else:
+            gathered_indices = np.array(list(np.ndindex(*batch_gradients.shape.as_list())))
+            gathered_indices = np.concatenate([gathered_indices, gathered_indices[:, 1:]],
+                                              axis=1)
+            diagonal_derivative = tf.scatter_nd(gathered_indices,
+                                                tf.reshape(batch_gradients,
+                                                           (-1,)),
+                                                batch_hessian.shape)
+            diagonal_derivative = diagonal_derivative.numpy()
+        return diagonal_derivative
+
+
     def _single_interaction(self, current_input, current_baseline,
                             current_alphas, num_samples, batch_size,
                             use_expectation, output_index,
@@ -257,9 +310,11 @@ class PathExplainerTF(Explainer):
             interaction_index: The index to take the interactions with respect to.
         """
         current_input = np.expand_dims(current_input, axis=0)
-        current_alphas = tf.reshape(current_alphas, (num_samples,) + \
+        current_alpha, current_beta = current_alphas
+        current_alpha = tf.reshape(current_alpha, (num_samples,) + \
                                     (1,) * (len(current_input.shape) - 1))
-
+        current_beta = tf.reshape(current_beta, (num_samples,) + \
+                                 (1,) * (len(current_input.shape) - 1))
         attribution_array = []
         for j in range(0, num_samples, batch_size):
             number_to_draw = min(batch_size, num_samples - j)
@@ -267,16 +322,17 @@ class PathExplainerTF(Explainer):
             batch_baseline = self._sample_baseline(current_baseline,
                                                    number_to_draw,
                                                    use_expectation)
-            batch_alphas = current_alphas[j:min(j + batch_size, num_samples)]
+            batch_alpha = current_alpha[j:min(j + batch_size, num_samples)]
+            batch_beta = current_beta[j:min(j + batch_size, num_samples)]
+            batch_product = batch_alpha * batch_beta
 
             reps = np.ones(len(current_input.shape)).astype(int)
             reps[0] = number_to_draw
             batch_input = tf.convert_to_tensor(np.tile(current_input, reps))
 
             batch_difference = batch_input - batch_baseline
-            batch_interpolated = batch_alphas * batch_input + \
-                                 (1.0 - batch_alphas) * batch_baseline
-
+            batch_interpolated = batch_product * batch_input + \
+                                 (1.0 - batch_product) * batch_baseline
             with tf.GradientTape() as second_order_tape:
                 second_order_tape.watch(batch_interpolated)
                 with tf.GradientTape() as first_order_tape:
@@ -300,6 +356,7 @@ class PathExplainerTF(Explainer):
                 #indexed into a particular gradient
                 batch_differences_secondary = batch_difference[tuple([slice(None)] + \
                                                                      interaction_index)]
+
                 for _ in range(len(current_input.shape) - 1):
                     batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
                                                                  axis=-1)
@@ -330,12 +387,18 @@ class PathExplainerTF(Explainer):
                 batch_differences_secondary = batch_difference
 
                 for _ in range(len(current_input.shape) - 1):
+                    batch_product = tf.expand_dims(batch_product, axis=-1)
                     batch_difference = tf.expand_dims(batch_difference, axis=-1)
                     batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
                                                                  axis=1)
 
-            batch_difference = batch_difference * batch_differences_secondary
-            batch_attributions = batch_hessian * batch_difference
+            off_diagonal_attributions = batch_hessian * batch_product * \
+                                        batch_difference * batch_differences_secondary
+            diagonal_derivative = self._get_diagonal_derivatives(batch_hessian,
+                                                                 batch_gradients,
+                                                                 interaction_index)
+            batch_attributions = off_diagonal_attributions + \
+                                 batch_difference * diagonal_derivative
             attribution_array.append(batch_attributions)
         attribution_array = np.concatenate(attribution_array, axis=0)
         attributions = np.mean(attribution_array, axis=0)
@@ -391,7 +454,9 @@ class PathExplainerTF(Explainer):
             input_iterable = enumerate(tqdm(inputs))
 
         for i, current_input in input_iterable:
-            current_alphas = self._sample_alphas(num_samples, use_expectation)
+            current_alphas = self._sample_alphas(num_samples,
+                                                 use_expectation,
+                                                 use_product=True)
 
             if not use_expectation and baseline.shape[0] > 1:
                 current_baseline = np.expand_dims(baseline[i], axis=0)

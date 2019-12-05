@@ -3,6 +3,7 @@ Defines a function to plot individual feature-level importances
 across a dataset.
 """
 import pandas as pd
+import numpy as np
 import altair as alt
 
 def scatter_plot(attributions,
@@ -59,7 +60,18 @@ def scatter_plot(attributions,
 
     if color_by is not None:
         color_name = 'Value of {}'.format(feature_names[color_by])
-        data_df[color_name] = feature_values[:, color_by]
+        color_column = feature_values[:, color_by]
+        vmin = np.nanpercentile(color_column, 5)
+        vmax = np.nanpercentile(color_column, 95)
+        if vmin == vmax:
+            vmin = np.nanpercentile(color_column, 1)
+            vmax = np.nanpercentile(color_column, 99)
+            if vmin == vmax:
+                vmin = np.min(color_column)
+                vmax = np.max(color_column)
+        color_column = np.clip(color_column, vmin, vmax)
+
+        data_df[color_name] = color_column
 
     chart = alt.Chart(data_df).mark_point(filled=True, size=20).encode(
         x=alt.X(x_name + ':Q'),
@@ -85,7 +97,7 @@ def scatter_plot(attributions,
         main_name = 'Main effect of {} '.format(feature_names[feature_index])
         inter_df = pd.DataFrame({
             x_name: feature_values[:, feature_index],
-            color_name: feature_values[:, color_by],
+            color_name: color_column,
             inter_name: interaction_column,
             main_name: attributions[:, feature_index] - interaction_column
         })
