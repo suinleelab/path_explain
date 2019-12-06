@@ -88,9 +88,9 @@ def scatter_plot(attributions,
             raise ValueError('Provided interactions but argument ' + \
                              'color_by was not specified')
         if interactions.shape == attributions.shape:
-            interaction_column = interactions[:, color_by]
+            interaction_column = 2.0 * interactions[:, color_by]
         else:
-            interaction_column = interactions[:, feature_index, color_by]
+            interaction_column = interactions[:, feature_index, color_by] + interactions[:, color_by, feature_index]
 
         inter_name = 'Interaction between {} and {}'.format(feature_names[feature_index],
                                                             feature_names[color_by])
@@ -99,8 +99,11 @@ def scatter_plot(attributions,
             x_name: feature_values[:, feature_index],
             color_name: color_column,
             inter_name: interaction_column,
-            main_name: attributions[:, feature_index] - interaction_column
+            main_name:  attributions[:, feature_index] - interaction_column
         })
+        # TODO: WHY DO WE MULTIPLY BY TWO ABOVE? THINK ABOUT
+        # WHY WE SHOULD SUBTRACT BY BOTH i,j entry and j,i
+        # IN TERMS OF COMPLETENESS -
 
         inter_chart = alt.Chart(inter_df).mark_point(filled=True, size=20).encode(
             x=alt.X(x_name + ':Q'),
