@@ -6,6 +6,22 @@ import pandas as pd
 import numpy as np
 import altair as alt
 
+def _get_bounds(arr):
+    """
+    A helper function to clip an array.
+    Args:
+        arr: A numpy array
+    """
+    vmin = np.nanpercentile(arr, 5)
+    vmax = np.nanpercentile(arr, 95)
+    if vmin == vmax:
+        vmin = np.nanpercentile(arr, 1)
+        vmax = np.nanpercentile(arr, 99)
+        if vmin == vmax:
+            vmin = np.min(arr)
+            vmax = np.max(arr)
+    return vmin, vmax
+
 def scatter_plot(attributions,
                  feature_values,
                  feature_index,
@@ -61,14 +77,7 @@ def scatter_plot(attributions,
     if color_by is not None:
         color_name = 'Value of {}'.format(feature_names[color_by])
         color_column = feature_values[:, color_by]
-        vmin = np.nanpercentile(color_column, 5)
-        vmax = np.nanpercentile(color_column, 95)
-        if vmin == vmax:
-            vmin = np.nanpercentile(color_column, 1)
-            vmax = np.nanpercentile(color_column, 99)
-            if vmin == vmax:
-                vmin = np.min(color_column)
-                vmax = np.max(color_column)
+        vmin, vmax = _get_bounds(color_column)
         color_column = np.clip(color_column, vmin, vmax)
 
         data_df[color_name] = color_column
@@ -90,7 +99,8 @@ def scatter_plot(attributions,
         if interactions.shape == attributions.shape:
             interaction_column = 2.0 * interactions[:, color_by]
         else:
-            interaction_column = interactions[:, feature_index, color_by] + interactions[:, color_by, feature_index]
+            interaction_column = interactions[:, feature_index, color_by] + \
+                                 interactions[:, color_by, feature_index]
 
         inter_name = 'Interaction between {} and {}'.format(feature_names[feature_index],
                                                             feature_names[color_by])

@@ -31,6 +31,164 @@ class PathExplainerTF(Explainer):
         except AttributeError:
             pass
 
+    def accumulation_function(self,
+                              batch_input,
+                              batch_baseline,
+                              batch_alphas,
+                              output_index=None,
+                              second_order=False,
+                              interaction_index=None):
+        """
+        A function that computes the logic of combining gradients and
+        the difference from reference. This function is meant to
+        be overloaded in the case of custom gradient logic.
+
+        Args:
+            batch_input: A batch of input to the model. The model
+                         should be able to be called as self.model(batch_input).
+            batch_baseline: A batch of input to the model representing the
+                            baseline input.
+            batch_alphas: A batch of interpolation constants.
+            output_index: An integer. Which output to index into. If None,
+                          will take the gradient with respect to the
+                          sum of the outputs.
+            second_order: Set to True to return the hessian rather than
+                          the gradient.
+            interaction_index: An index into the features of the input. See
+                               self.interactions for a complete description
+                               of what this argument should be.
+        """
+        if not second_order:
+            batch_difference = batch_input - batch_baseline
+            batch_interpolated = batch_alphas * batch_input + \
+                                 (1.0 - batch_alphas) * batch_baseline
+            batch_gradients = self.gradient_function(batch_interpolated,
+                                                     output_index)
+            batch_attributions = batch_gradients * batch_difference
+            return batch_attributions
+
+        batch_alpha, batch_beta = batch_alphas
+        batch_product = batch_alpha * batch_beta
+        batch_difference = batch_input - batch_baseline
+        batch_interpolated = batch_product * batch_input + \
+                             (1.0 - batch_product) * batch_baseline
+
+        batch_gradients, batch_hessian = self.gradient_function(batch_interpolated,
+                                               output_index,
+                                               second_order=True,
+                                               interaction_index=interaction_index)
+
+        ########################
+        # This code is just preparing arrays to be the right shape for broadcasting.
+        if interaction_index is not None:
+            batch_differences_secondary = batch_difference[tuple([slice(None)] + \
+                                                                 interaction_index)]
+            for _ in range(len(batch_input.shape) - 1):
+                batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
+                                                             axis=-1)
+        else:
+            batch_differences_secondary = batch_difference
+            for _ in range(len(batch_input.shape) - 1):
+                batch_product = tf.expand_dims(batch_product, axis=-1)
+                batch_difference = tf.expand_dims(batch_difference, axis=-1)
+                batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
+                                                             axis=1)
+        ########################
+        off_diagonal_attributions = batch_hessian * batch_product * \
+                                    batch_difference * batch_differences_secondary
+        diagonal_derivative = self._get_diagonal_derivatives(batch_hessian,
+                                                             batch_gradients,
+                                                             interaction_index)
+        batch_attributions = off_diagonal_attributions + \
+                             batch_difference * diagonal_derivative
+        return batch_attributions
+
+    def gradient_function(self, batch_input,
+                           output_index=None,
+                           second_order=False,
+                           interaction_index=None):
+        """
+        A function to compute the gradients of a tensorflow model.
+        If you want to use a custom gradient function, you
+        should sub-class this class and overload this function.
+
+        Args:
+            batch_input: A batch of input to the model. The model
+                         should be able to be called as self.model(batch_input).
+            output_index: An integer. Which output to index into. If None,
+                          will take the gradient with respect to the
+                          sum of the outputs.
+            second_order: Set to True to return the hessian rather than
+                          the gradient.
+            interaction_index: An index into the features of the input. See
+                               self.interactions for a complete description
+                               of what this argument should be.
+
+        Returns: An array representing the gradient or the hessian of the function.
+                 If second_order=False, then this function should return the gradient
+                 of the output (indexed by output_index) with respect to the input. This
+                 array should be the same shape as the input, batch dimensions included.
+                 If second_order=True, then this function should return the hessian
+                 of the output with respect to the input as well as the
+                 gradient with respect to the input (this is generally no additional work
+                 since you need to compute the gradient to compute the hessian).
+                 If interaction_index is not None, then the hessian
+                 should be the same shape as the input and should be the
+                 second order derivatives with respect to the feature
+                 indicated by interaction_index. If interaction_index is None,
+                 then the hessian should duplicate the dimensionality of the input.
+                 See the comments of this function for more details.
+        """
+        if not second_order:
+            with tf.GradientTape() as tape:
+                tape.watch(batch_input)
+
+                batch_predictions = self.model(batch_input)
+                if output_index is not None:
+                    batch_predictions = batch_predictions[:, output_index]
+            batch_gradients = tape.gradient(batch_predictions, batch_input)
+            return batch_gradients
+
+        ## Handle the second order derivatives here
+        with tf.GradientTape() as second_order_tape:
+            second_order_tape.watch(batch_input)
+            with tf.GradientTape() as first_order_tape:
+                first_order_tape.watch(batch_input)
+
+                batch_predictions = self.model(batch_input)
+                if output_index is not None:
+                    batch_predictions = batch_predictions[:, output_index]
+
+            # Same shape as the input, e.g. [batch_size, ...]
+            batch_gradients = first_order_tape.gradient(batch_predictions, batch_input)
+            if interaction_index is not None:
+                batch_gradients = batch_gradients[tuple([slice(None)] + interaction_index)]
+
+        if interaction_index is not None:
+            # In this case, the hessian is the same size as the input because we
+            # indexed into a particular gradient
+            batch_hessian = second_order_tape.gradient(batch_gradients, batch_input)
+        else:
+            # In this case, the hessian matrix duplicates the dimensionality of the
+            # input. That is, if we have 5 CIFAR10 images for example, the
+            # input is of shape [5, 32, 32, 3]. The hessian will be of
+            # shape [5, 32, 32, 3, 5, 32, 32, 3]. This can
+            # be very memory intesive - there are other strategies,
+            # but this one sacrifices memory to be fast
+            batch_hessian = second_order_tape.jacobian(batch_gradients, batch_input)
+            batch_hessian = batch_hessian.numpy()
+
+            # We index into the non-zero elements to get
+            # the shape [5, 32, 32, 3, 32, 32, 3]
+            # If you are overloading this function, you should
+            # return an array of the same shape.
+            hessian_index_array = [np.arange(batch_input.shape[0])] + \
+                                  [slice(None)] * (len(batch_input.shape) - 1)
+            hessian_index_array = 2 * hessian_index_array
+            batch_hessian = batch_hessian[tuple(hessian_index_array)]
+
+        return batch_gradients, batch_hessian
+
     def _sample_baseline(self, baseline, number_to_draw, use_expectation):
         """
         An internal function to sample the baseline.
@@ -133,24 +291,28 @@ class PathExplainerTF(Explainer):
             reps[0] = number_to_draw
             batch_input = tf.convert_to_tensor(np.tile(current_input, reps))
 
-            batch_difference = batch_input - batch_baseline
-            batch_interpolated = batch_alphas * batch_input + \
-                                 (1.0 - batch_alphas) * batch_baseline
-
-            with tf.GradientTape() as tape:
-                tape.watch(batch_interpolated)
-
-                batch_predictions = self.model(batch_interpolated)
-                if output_index is not None:
-                    batch_predictions = batch_predictions[:, output_index]
-
-            batch_gradients = tape.gradient(batch_predictions, batch_interpolated)
-
-            batch_attributions = batch_gradients * batch_difference
+            batch_attributions = self.accumulation_function(batch_input,
+                                                            batch_baseline,
+                                                            batch_alphas,
+                                                            output_index=output_index,
+                                                            second_order=False,
+                                                            interaction_index=None)
             attribution_array.append(batch_attributions)
         attribution_array = np.concatenate(attribution_array, axis=0)
         attributions = np.mean(attribution_array, axis=0)
         return attributions
+
+    def _get_test_output(self,
+                        inputs):
+        """
+        Internal helper function to get the
+        output of a model. Designed to
+        be overloaded.
+
+        Args:
+            inputs: Inputs to the model
+        """
+        return self.model(inputs[0:1])
 
     def _init_array(self,
                     inputs,
@@ -164,7 +326,7 @@ class PathExplainerTF(Explainer):
         Args:
             See self.attributions for definitions.
         """
-        test_output = self.model(inputs[0:1])
+        test_output = self._get_test_output(inputs)
         is_multi_output = len(test_output.shape) > 1
         shape_tuple = inputs.shape
         num_classes = test_output.shape[-1]
@@ -330,75 +492,12 @@ class PathExplainerTF(Explainer):
             reps[0] = number_to_draw
             batch_input = tf.convert_to_tensor(np.tile(current_input, reps))
 
-            batch_difference = batch_input - batch_baseline
-            batch_interpolated = batch_product * batch_input + \
-                                 (1.0 - batch_product) * batch_baseline
-            with tf.GradientTape() as second_order_tape:
-                second_order_tape.watch(batch_interpolated)
-                with tf.GradientTape() as first_order_tape:
-                    first_order_tape.watch(batch_interpolated)
-
-                    batch_predictions = self.model(batch_interpolated)
-                    if output_index is not None:
-                        batch_predictions = batch_predictions[:, output_index]
-
-                #Same shape as the input, e.g. [batch_size, ...]
-                batch_gradients = first_order_tape.gradient(batch_predictions, batch_interpolated)
-                if interaction_index is not None:
-                    if isinstance(interaction_index, int):
-                        interaction_index = [interaction_index]
-                    else:
-                        interaction_index = list(interaction_index)
-                    batch_gradients = batch_gradients[tuple([slice(None)] + interaction_index)]
-
-            if interaction_index is not None:
-                #In this case, the hessian is the same size as the input because we
-                #indexed into a particular gradient
-                batch_differences_secondary = batch_difference[tuple([slice(None)] + \
-                                                                     interaction_index)]
-
-                for _ in range(len(current_input.shape) - 1):
-                    batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
-                                                                 axis=-1)
-                batch_hessian = second_order_tape.gradient(batch_gradients, batch_interpolated)
-            else:
-                #In this case, the hessian matrix duplicates the dimensionality of the
-                #input. That is, if we have 5 CIFAR10 images for example, the
-                #input is of shape [5, 32, 32, 3]. The hessian will be of
-                #shape [5, 32, 32, 3, 5, 32, 32, 3]. This can
-                #be very memory intesive - there are other strategies,
-                #but this one sacrifices memory to be fast
-                batch_hessian = second_order_tape.jacobian(batch_gradients, batch_interpolated)
-                batch_hessian = batch_hessian.numpy()
-
-                #We index into the non-zero elements to get
-                #the shape [5, 32, 32, 3, 32, 32, 3]
-                hessian_index_array = [np.arange(number_to_draw)] + \
-                                      [slice(None)] * (len(current_input.shape) - 1)
-                hessian_index_array = 2 * hessian_index_array
-                batch_hessian = batch_hessian[tuple(hessian_index_array)]
-
-                #Now we adjust the batch_difference tensor to
-                #be ready to broadcast. We use a broadcasting trick
-                #to get the pairwise-differences
-
-                #Note: in eager mode, this copies the value,
-                #not the reference
-                batch_differences_secondary = batch_difference
-
-                for _ in range(len(current_input.shape) - 1):
-                    batch_product = tf.expand_dims(batch_product, axis=-1)
-                    batch_difference = tf.expand_dims(batch_difference, axis=-1)
-                    batch_differences_secondary = tf.expand_dims(batch_differences_secondary,
-                                                                 axis=1)
-
-            off_diagonal_attributions = batch_hessian * batch_product * \
-                                        batch_difference * batch_differences_secondary
-            diagonal_derivative = self._get_diagonal_derivatives(batch_hessian,
-                                                                 batch_gradients,
-                                                                 interaction_index)
-            batch_attributions = off_diagonal_attributions + \
-                                 batch_difference * diagonal_derivative
+            batch_attributions = self.accumulation_function(batch_input,
+                                                            batch_baseline,
+                                                            batch_alphas=(batch_alpha, batch_beta),
+                                                            output_index=output_index,
+                                                            second_order=True,
+                                                            interaction_index=interaction_index)
             attribution_array.append(batch_attributions)
         attribution_array = np.concatenate(attribution_array, axis=0)
         attributions = np.mean(attribution_array, axis=0)
@@ -448,6 +547,11 @@ class PathExplainerTF(Explainer):
                                                                       output_indices,
                                                                       interaction_index,
                                                                       True)
+        if interaction_index is not None:
+            if isinstance(interaction_index, int):
+                interaction_index = [interaction_index]
+            else:
+                interaction_index = list(interaction_index)
 
         input_iterable = enumerate(inputs)
         if verbose:
