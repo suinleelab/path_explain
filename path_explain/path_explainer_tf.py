@@ -209,7 +209,7 @@ class PathExplainerTF(Explainer):
             sample_indices = np.random.choice(baseline.shape[0],
                                               size=number_to_draw,
                                               replace=replace)
-            sampled_baseline = baseline[sample_indices]
+            sampled_baseline = tf.gather(baseline, sample_indices)
         else:
             reps = np.ones(len(baseline.shape)).astype(int)
             reps[0] = number_to_draw
@@ -394,7 +394,10 @@ class PathExplainerTF(Explainer):
 
             if is_multi_output:
                 if output_indices is not None:
-                    output_index = output_indices[i]
+                    if isinstance(output_indices, int):
+                        output_index = output_indices
+                    else:
+                        output_index = output_indices[i]
                     current_attributions = self._single_attribution(current_input,
                                                                     current_baseline,
                                                                     current_alphas,
@@ -506,8 +509,7 @@ class PathExplainerTF(Explainer):
     def interactions(self, inputs, baseline,
                      batch_size=50, num_samples=100,
                      use_expectation=True, output_indices=None,
-                     verbose=False, explain_index=None,
-                     interaction_index=None):
+                     verbose=False, interaction_index=None):
         """
         A function to compute path interactions (attributions of
         attributions) on the given inputs.
@@ -569,7 +571,10 @@ class PathExplainerTF(Explainer):
 
             if is_multi_output:
                 if output_indices is not None:
-                    output_index = output_indices[i]
+                    if isinstance(output_indices, int):
+                        output_index = output_indices
+                    else:
+                        output_index = output_indices[i]
                     current_interactions = self._single_interaction(current_input,
                                                                     current_baseline,
                                                                     current_alphas,

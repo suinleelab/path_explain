@@ -3,7 +3,7 @@ import pandas
 import numpy
 import sklearn.model_selection
 
-def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt', 
+def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
          anthropometrypath="data/DU4111.txt", vitlpath="data/N92vitl.txt"):
     '''
     Load NHANES I biochemistry tape and mortality data.
@@ -12,30 +12,30 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
     Parameters
     ----------
     biochemtapepath: (str) Path to the NHANES I biochemistry tape ("DU4800.txt")
-    medexamtapepath: (str) Path to the NHANES I general medical exam tape 
+    medexamtapepath: (str) Path to the NHANES I general medical exam tape
       ("DU4233.txt")
     anthropometrypath: (str) Path to the NAHENS I anthropometry, goniometry,
       skeletal age, bone density, and cortical thickness tape ("DU4111.txt")
-    vitlpath: (str) Path to the NHEFS 1992 public mortality data tape 
+    vitlpath: (str) Path to the NHEFS 1992 public mortality data tape
       ("N92vitl.txt")
 
     -------
     Returns
     -------
-    X: (pandas.DataFrame) Dataframe containing select information from the 
+    X: (pandas.DataFrame) Dataframe containing select information from the
       biochemistry data tape, generally confined to data collected from common
-      laboratory blood tests (comprehensive metabolic panel, complete blood 
+      laboratory blood tests (comprehensive metabolic panel, complete blood
       count with differential, cholesterol test, sedimentation rate, and urine
-      dipsticks) as well as age and sex.  The index is the NHANES sequence 
+      dipsticks) as well as age and sex.  The index is the NHANES sequence
       number (a unique identifier for each participant).
       Note that categorical covariates are one-hot encoded in dummy columns.
       Continuous covariates are encoded as floating point values, and any
-      corresponding "special" codes are encoded in a dummy column (e.g., 
-      "serum_albumin_isMissingAge1to3" is True if the serum albumin field is 
-      "9999" and False otherwise). Blank fields are coded as 'NaN', and a 
-      corresponding dummy column "<fieldname>_isBlank" is set to True for that 
+      corresponding "special" codes are encoded in a dummy column (e.g.,
+      "serum_albumin_isMissingAge1to3" is True if the serum albumin field is
+      "9999" and False otherwise). Blank fields are coded as 'NaN', and a
+      corresponding dummy column "<fieldname>_isBlank" is set to True for that
       sample.
-    y: (numpy.ndarray) Array indicating whether the participant survived for 15 
+    y: (numpy.ndarray) Array indicating whether the participant survived for 15
       years past the date of the NHANES I examination. y[i] is True if the
       participant described by X.iloc[i] survived for at least 15 years past
       the date of the NHANES I examination and False otherwise. Examination
@@ -82,7 +82,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 isImputed = False
             if isImputed:
                 d[seqn]['serum_albumin'] = numpy.nan
-                # I assume that the study having imputed the value is the same 
+                # I assume that the study having imputed the value is the same
                 # as the study having left the field blank
                 d[seqn]['serum_albumin_isBlank'] = True
 
@@ -101,7 +101,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             d[seqn]['alkaline_phosphatase'] /= 10
 
             # SGOT/aspartate aminotransferase
-            try: 
+            try:
                 d[seqn]['SGOT'] = float(line[454:458])
             except ValueError:
                 d[seqn]['SGOT'] = numpy.nan
@@ -126,7 +126,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             d[seqn]['BUN'] /= 10
 
             # Calcium
-            try: 
+            try:
                 d[seqn]['calcium'] = float(line[465:468])
             except ValueError:
                 d[seqn]['calcium'] = numpy.nan
@@ -172,7 +172,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 d[seqn]['sodium'] = numpy.nan
 
             # Total bilirubin:
-            try: 
+            try:
                 d[seqn]['total_bilirubin'] = float(line[450:454])
             except ValueError:
                 d[seqn]['total_bilirubin'] = numpy.nan
@@ -185,7 +185,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             d[seqn]['total_bilirubin'] /= 100
 
             # Serum protein
-            try: 
+            try:
                 d[seqn]['serum_protein'] = float(line[226:230])
             except ValueError:
                 d[seqn]['serum_protein'] = numpy.nan
@@ -200,7 +200,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 isImputed = False
             if isImputed:
                 d[seqn]['serum_protein'] = numpy.nan
-                # I assume that the study having imputed the value is the same 
+                # I assume that the study having imputed the value is the same
                 # as the study having left the field blank
                 d[seqn]['serum_protein_isBlank'] = True
 
@@ -227,7 +227,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             d[seqn]['white_blood_cells'] /= 10
 
             # Hemoglobin
-            try: 
+            try:
                 d[seqn]['hemoglobin'] = float(line[246:250])
             except ValueError:
                 d[seqn]['hemoglobin'] = numpy.nan
@@ -243,12 +243,12 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 isImputed = False
             if isImputed:
                 d[seqn]['hemoglobin'] = numpy.nan
-                # I assume that the study having imputed the value is the same 
+                # I assume that the study having imputed the value is the same
                 # as the study having left the field blank
                 d[seqn]['hemoglobin_isBlank'] = True
 
             # Hematocrit
-            try: 
+            try:
                 d[seqn]['hematocrit'] = float(line[251:254])
             except ValueError:
                 d[seqn]['hematocrit'] = numpy.nan
@@ -263,20 +263,20 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 isImputed = False
             if isImputed:
                 d[seqn]['hematocrit'] = numpy.nan
-                # I assume that the study having imputed the value is the same 
+                # I assume that the study having imputed the value is the same
                 # as the study having left the field blank
                 d[seqn]['hematocrit_isBlank'] = True
 
             # Platelet estimate
             try:
-                platelets = int(line[337]) 
+                platelets = int(line[337])
             except:
                 platelets = numpy.nan
             d[seqn]['platelets_isNormal'] = (platelets == 0)
             d[seqn]['platelets_isIncreased'] = (platelets == 2)
             d[seqn]['platelets_isDecreased'] = (platelets == 3)
-            d[seqn]['platelets_isNoestimate'] = (platelets == 9) 
-            d[seqn]['platelets_isBlank'] = numpy.isnan(platelets) 
+            d[seqn]['platelets_isNoestimate'] = (platelets == 9)
+            d[seqn]['platelets_isBlank'] = numpy.isnan(platelets)
 
             # Segmented neutrophils (mature)
             try:
@@ -285,35 +285,35 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 d[seqn]['segmented_neutrophils'] = numpy.nan
             d[seqn]['segmented_neutrophils_isBlank'] = numpy.isnan(d[seqn]['segmented_neutrophils'])
 
-            # Lymphocytes 
+            # Lymphocytes
             try:
                 d[seqn]['lymphocytes'] = float(line[326:328])
             except ValueError:
                 d[seqn]['lymphocytes'] = numpy.nan
             d[seqn]['lymphocytes_isBlank'] = numpy.isnan(d[seqn]['lymphocytes'])
 
-            # monocytes 
+            # monocytes
             try:
                 d[seqn]['monocytes'] = float(line[328:330])
             except ValueError:
                 d[seqn]['monocytes'] = numpy.nan
             d[seqn]['monocytes_isBlank'] = numpy.isnan(d[seqn]['monocytes'])
 
-            # eosinophils 
+            # eosinophils
             try:
                 d[seqn]['eosinophils'] = float(line[322:324])
             except ValueError:
                 d[seqn]['eosinophils'] = numpy.nan
             d[seqn]['eosinophils_isBlank'] = numpy.isnan(d[seqn]['eosinophils'])
 
-            # basophils 
+            # basophils
             try:
                 d[seqn]['basophils'] = float(line[324:326])
             except ValueError:
                 d[seqn]['basophils'] = numpy.nan
             d[seqn]['basophils_isBlank'] = numpy.isnan(d[seqn]['basophils'])
 
-            # band_neutrophils 
+            # band_neutrophils
             try:
                 d[seqn]['band_neutrophils'] = float(line[318:320])
             except ValueError:
@@ -321,7 +321,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             d[seqn]['band_neutrophils_isBlank'] = numpy.isnan(d[seqn]['band_neutrophils'])
 
             # Serum cholesterol
-            try: 
+            try:
                 d[seqn]['cholesterol'] = float(line[236:240])
             except ValueError:
                 d[seqn]['cholesterol'] = numpy.nan
@@ -336,23 +336,23 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 isImputed = False
             if isImputed:
                 d[seqn]['cholesterol'] = numpy.nan
-                # I assume that the study having imputed the value is the same 
+                # I assume that the study having imputed the value is the same
                 # as the study having left the field blank
                 d[seqn]['cholesterol_isBlank'] = True
 
             # Urine albumin
-            try: 
+            try:
                 urine_albumin = int(line[500])
             except ValueError:
                 urine_albumin = numpy.nan
             d[seqn]['urine_albumin_isNegative'] = (urine_albumin == 0)
-            d[seqn]['urine_albumin_is>=30'] = (urine_albumin == 1) 
+            d[seqn]['urine_albumin_is>=30'] = (urine_albumin == 1)
             d[seqn]['urine_albumin_is>=100'] = (urine_albumin == 2)
-            d[seqn]['urine_albumin_is>=300'] = (urine_albumin == 3) 
-            d[seqn]['urine_albumin_is>=1000'] = (urine_albumin == 4) 
+            d[seqn]['urine_albumin_is>=300'] = (urine_albumin == 3)
+            d[seqn]['urine_albumin_is>=1000'] = (urine_albumin == 4)
             d[seqn]['urine_albumin_isTrace'] = (urine_albumin == 5)
             d[seqn]['urine_albumin_isBlankbutapplicable'] = (urine_albumin == 8)
-            d[seqn]['urine_albumin_isBlank'] = numpy.isnan(urine_albumin) 
+            d[seqn]['urine_albumin_isBlank'] = numpy.isnan(urine_albumin)
 
             # Urine glucose
             try:
@@ -407,7 +407,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 d[seqn]['sedimentation_rate_isBlankbutapplicable'] = False
 
             # Uric acid
-            try: 
+            try:
                 d[seqn]['uric_acid'] = float(line[462:465])
             except ValueError:
                 d[seqn]['uric_acid'] = numpy.nan
@@ -439,7 +439,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 diastolic = int(line[230:233])
             except ValueError:
                 diastolic = numpy.nan
-            # For this case, we have to treat "blank but applicable" and 
+            # For this case, we have to treat "blank but applicable" and
             # "age under 6" the same as blank
             if diastolic in [888, 999]:
                 diastolic = numpy.nan
@@ -447,7 +447,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 d[seqn]['pulse_pressure'] = numpy.nan
             else:
                 d[seqn]['pulse_pressure'] = d[seqn]['systolic_blood_pressure'] - diastolic
-            
+
             ## Obesity
 #             try:
 #                 obesity = int(line[360])
@@ -472,11 +472,11 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             try:
                 d[seqn]['weight'] = int(line[259:264])
             except ValueError:
-                d[seqn]['weight'] = numpy.nan 
+                d[seqn]['weight'] = numpy.nan
             if d[seqn]['weight'] == 88888:
                 d[seqn]['weight'] = numpy.nan
             # Here we group together the 98 participants with imputed weights
-            # and the 4 participants for whom the field is "blank but 
+            # and the 4 participants for whom the field is "blank but
             # applicable"
             weightIsImputed = (int(line[264]) == 1)
             if weightIsImputed:
@@ -493,7 +493,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
                 d[seqn]['height'] = numpy.nan
 
             # Here we group together the 60 participants with imputed heights
-            # and the 4 participants for whom the field is "blank but 
+            # and the 4 participants for whom the field is "blank but
             # applicable"
             heightIsImputed = (int(line[272]) == 1)
             if heightIsImputed:
@@ -505,7 +505,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
     with open(vitlpath, 'r') as handle:
         for line in handle:
             seqn = int(line[11:16])
-            try: 
+            try:
                 d[seqn]
             except KeyError:
                 continue
@@ -525,7 +525,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
             try:
                 d2[seqn]['year_deceased'] = int(line[64:66])
             except ValueError:
-                d2[seqn]['year_deceased'] = numpy.nan 
+                d2[seqn]['year_deceased'] = numpy.nan
             d2[seqn]['month_deceased_isDontknow'] = (d2[seqn]['month_deceased'] == 98)
             d2[seqn]['month_deceased_isNotascertained'] = (d2[seqn]['month_deceased'] == 99)
             d2[seqn]['month_deceased_isBlank'] = numpy.isnan(d2[seqn]['month_deceased'])
@@ -545,7 +545,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
         alive_time = d2[seqn]['year_last_known_alive']+d2[seqn]['month_last_known_alive']/12.0
         dead_time = d2[seqn]['year_deceased']+d2[seqn]['month_deceased']/12.0
         exam_time = d[seqn]['exam_year']+d[seqn]['exam_month']/12.0
-        
+
         if numpy.isnan(dead_time):
             if alive_time > exam_time:
                 years = -(alive_time - exam_time)
@@ -560,7 +560,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
 #         )
 #         years = maxalive- d[seqn]['exam_year']+d[seqn]['exam_month']/12.0
 #         print (d[seqn]['exam_month'], d2[seqn]['month_last_known_alive'], d2[seqn]['month_deceased'])
-        
+
 
 #         if d2[seqn]['year_last_known_alive'] - d[seqn]['exam_year'] > 15:
 #             d[seqn]['survived_15_years'] = True
@@ -577,7 +577,7 @@ def _load(biochemtapepath="data/DU4800.txt", medexamtapepath='data/DU4233.txt',
 #             d[seqn]['survived_15_years'] = False
 #         else:
 #             d[seqn]['survived_15_years'] = numpy.nan
-                
+
         del d[seqn]['exam_year']
         del d[seqn]['exam_month']
 
@@ -609,20 +609,20 @@ def load(**kwargs):
     assessment of the model's accuracy. The data used when building a model
     (for training and hyperparameter tuning) makes up 80% of the data, while
     the model's performance should be assessed on the remaining 20%. Of the
-    80% used for training, 80% of that subset (64% of total) is provided for 
+    80% used for training, 80% of that subset (64% of total) is provided for
     training, and the remaining 20% of that subset (16% of total) is provided
     for validating the choice of hyperparameters.
 
     ----------
     Returns
     ----------
-    (X, y): (pandas.Dataframe, numpy.ndarray) The full dataset and 
+    (X, y): (pandas.Dataframe, numpy.ndarray) The full dataset and
       corresponding class labels
-    (Xtrain, ytrain): (pandas.Dataframe, numpy.ndarray) 80% of the full data 
+    (Xtrain, ytrain): (pandas.Dataframe, numpy.ndarray) 80% of the full data
       set.
-    (Xtraintrain, ytraintrain): (pandas.Dataframe, numpy.ndarray) 64% of full 
+    (Xtraintrain, ytraintrain): (pandas.Dataframe, numpy.ndarray) 64% of full
       data set.
-    (Xtrainvalid, ytrainvalid): (pandas.Dataframe, numpy.ndarray) 16% of full 
+    (Xtrainvalid, ytrainvalid): (pandas.Dataframe, numpy.ndarray) 16% of full
       data set.
     (Xtest, ytest): (pandas.Dataframe, numpy.ndarray) 20% of full data set.
     '''
@@ -652,10 +652,10 @@ def load_standardized(**kwargs):
     '''
     Load NHANES I data. See load() and _load() docstrings for more information.
     This function returns the same data as load(), except the data is
-    mean-centered and scaled to unit variance. In particular, centering and 
+    mean-centered and scaled to unit variance. In particular, centering and
     normalization is performed based on the mean and standard deviation of the
     training data (Xtraintrain and Xtrainvalid).
-    
+
     Missing values are mean imputed.
     '''
     (X, y), (Xtrain, ytrain), (Xtraintrain, ytraintrain), \
@@ -691,7 +691,7 @@ def load_standardized(**kwargs):
            (Xtrainvalid, ytrainvalid), \
            (Xtest, ytest)
 
-    
+
 
 def test():
     load()

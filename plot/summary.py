@@ -41,7 +41,8 @@ def summary_plot(attributions,
                  interactions=None,
                  interaction_feature=None,
                  feature_names=None,
-                 plot_top_k=None):
+                 plot_top_k=None,
+                 standardize_features=True):
     """
     Function to draw an interactive scatter plot of
     attribution values. Since this is built on top
@@ -68,7 +69,7 @@ def summary_plot(attributions,
         plot_top_k = attributions.shape[1]
     mean_abs_attr = np.mean(np.abs(attributions), axis=0)
     max_order = np.argsort(mean_abs_attr)
-    feature_order = max_order[:plot_top_k][::-1]
+    feature_order = max_order[::-1][:plot_top_k]
 
     if feature_names is None:
         feature_names = ['Feature {}'.format(i) for i in range(feature_values.shape[1])]
@@ -77,13 +78,16 @@ def summary_plot(attributions,
     select_attributions = attributions[:, feature_order]
     feature_names = [feature_names[i] for i in feature_order]
 
-    standardized_feature_values = (feature_values - np.mean(feature_values,
-                                                            axis=0,
-                                                            keepdims=True))
-    standardized_feature_values = standardized_feature_values / \
-                                  np.std(standardized_feature_values,
-                                         axis=0,
-                                         keepdims=True)
+    if standardize_features:
+        standardized_feature_values = (feature_values - np.mean(feature_values,
+                                                                axis=0,
+                                                                keepdims=True))
+        standardized_feature_values = standardized_feature_values / \
+                                      (np.std(standardized_feature_values,
+                                             axis=0,
+                                             keepdims=True) + 1e7)
+    else:
+        standardized_feature_values = feature_values
     vmin = np.nanpercentile(standardized_feature_values, 5)
     vmax = np.nanpercentile(standardized_feature_values, 95)
     if vmin == vmax:

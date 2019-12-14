@@ -42,7 +42,6 @@ class Explainer():
                      use_expectation=True,
                      output_indices=None,
                      verbose=False,
-                     explain_index=None,
                      interaction_index=None):
         """
         A function that returns the path interactions for the
