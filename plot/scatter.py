@@ -25,6 +25,26 @@ def _get_bounds(arr):
             vmax = np.max(arr)
     return vmin, vmax
 
+def _clean_input(feature_index, color_by, feature_names, attributions):
+    """
+    Helper function to check for some input errors.
+    """
+    if not isinstance(feature_index, int):
+        if feature_names is None:
+            raise ValueError('Provided argument feature_index {} was '.format(feature_index) + \
+                             'not an integer but feature_names was not specified.')
+        feature_index = feature_names.index(feature_index)
+    if color_by and not isinstance(color_by, int):
+        if feature_names is None:
+            raise ValueError('Provided argument color_by {} was '.format(color_by) + \
+                             'not an integer but feature_names was not specified.')
+        color_by = feature_names.index(color_by)
+
+    if feature_names is None:
+        feature_names = ['Feature {}'.format(i) for i in range(attributions.shape[1])]
+
+    return feature_index, color_by, feature_names
+
 def scatter_plot(attributions,
                  feature_values,
                  feature_index,
@@ -68,19 +88,10 @@ def scatter_plot(attributions,
         dpi: Resolution of each plot.
         kwargs: passed to matplotlib.pyplot.scatter
     """
-    if not isinstance(feature_index, int):
-        if feature_names is None:
-            raise ValueError('Provided argument feature_index {} was '.format(feature_index) + \
-                             'not an integer but feature_names was not specified.')
-        feature_index = feature_names.index(feature_index)
-    if color_by and not isinstance(color_by, int):
-        if feature_names is None:
-            raise ValueError('Provided argument color_by {} was '.format(color_by) + \
-                             'not an integer but feature_names was not specified.')
-        color_by = feature_names.index(color_by)
-
-    if feature_names is None:
-        feature_names = ['Feature {}'.format(i) for i in range(attributions.shape[1])]
+    feature_index, color_by, feature_names = _clean_input(feature_index,
+                                                          color_by,
+                                                          feature_names,
+                                                          attributions)
 
     x_name = 'Value of {}'.format(feature_names[feature_index])
     y_name = 'Attribution to {}'.format(feature_names[feature_index])
@@ -206,11 +217,8 @@ def _single_scatter(axis, data, x_name, y_name, color_name=None,
     Helper function. Generates a scatter plot with some custom
     settings.
     """
-    axis.spines['right'].set_linewidth(0.2)
-    axis.spines['top'].set_linewidth(0.2)
-    axis.spines['left'].set_linewidth(0.5)
-    axis.spines['bottom'].set_linewidth(0.5)
 
+    _set_axis_config(axis, linewidths=[0.2, 0.2, 0.5, 0.5])
     if 's' not in kwargs:
         kwargs['s'] = 7
     if 'cmap' not in kwargs:
@@ -231,3 +239,19 @@ def _single_scatter(axis, data, x_name, y_name, color_name=None,
         axis.set_xlim(x_limits)
     if y_limits is not None:
         axis.set_ylim(y_limits)
+
+def _set_axis_config(axis,
+                     linewidths=(0.0, 0.0, 0.0, 0.0),
+                     clear_y_ticks=False,
+                     clear_x_ticks=False):
+    """
+    Helper function to do some basic matplotlib cleaning.
+    """
+    axis.spines['right'].set_linewidth(linewidths[0])
+    axis.spines['top'].set_linewidth(linewidths[1])
+    axis.spines['left'].set_linewidth(linewidths[2])
+    axis.spines['bottom'].set_linewidth(linewidths[3])
+    if clear_x_ticks:
+        axis.set_xticks([])
+    if clear_y_ticks:
+        axis.set_yticks([])

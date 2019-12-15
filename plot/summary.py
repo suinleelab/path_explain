@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from .scatter import _get_bounds, _color_bar, _get_shared_limits
+from .scatter import _get_bounds, _color_bar, _get_shared_limits, _set_axis_config
 from . import colors
 
 def _get_jitter_array(feature_values,
@@ -38,6 +38,26 @@ def _get_jitter_array(feature_values,
         jitter_values *= 0.9 * (1.0 / np.max(jitter_values + 1))
         jitter_array[:, i] = jitter_values
     return jitter_array
+
+def _get_jitter_df(interactions, feature_values,
+                   select_attributions, attributions,
+                   interaction_feature, feature_order):
+    """
+    Helper function to call the jitter matrix function.
+    """
+    if interactions is None:
+        jitter_array = _get_jitter_array(feature_values, select_attributions)
+        jitter_df = pd.DataFrame(jitter_array)
+    else:
+        if interactions.shape == attributions.shape:
+            select_interactions = interactions[:, feature_order]
+        else:
+            if interaction_feature is None:
+                raise ValueError('Argument interaction was specified ' + \
+                                 'but argument interaction_feature was not.')
+            select_interactions = interactions[:, feature_order, interaction_feature]
+        jitter_df = pd.DataFrame(select_interactions)
+    return jitter_df
 
 def summary_plot(attributions,
                  feature_values,
@@ -118,19 +138,9 @@ def summary_plot(attributions,
     attribution_df = pd.melt(attribution_df, var_name='Attribution', value_name='Attribution Value')
     attribution_df = attribution_df.drop(columns=['Attribution'])
 
-    if interactions is None:
-        jitter_array = _get_jitter_array(feature_values, select_attributions)
-        jitter_df = pd.DataFrame(jitter_array)
-    else:
-        if interactions.shape == attributions.shape:
-            select_interactions = interactions[:, feature_order]
-        else:
-            if interaction_feature is None:
-                raise ValueError('Argument interaction was specified ' + \
-                                 'but argument interaction_feature was not.')
-            select_interactions = interactions[:, feature_order, interaction_feature]
-        jitter_df = pd.DataFrame(select_interactions)
-
+    jitter_df = _get_jitter_df(interactions, feature_values,
+                               select_attributions, attributions,
+                               interaction_feature, feature_order)
     jitter_df = pd.melt(jitter_df, var_name='Variable', value_name='Jitter')
     jitter_df = jitter_df.drop(columns=['Variable'])
     melted_df = pd.concat([feature_df, attribution_df, jitter_df], axis=1)
@@ -147,25 +157,23 @@ def summary_plot(attributions,
 
     fig, axs = plt.subplots(plot_top_k, 1, figsize=figsize, dpi=dpi)
     fig.subplots_adjust(left=0.2, hspace=0)
-    for i in range(plot_top_k - 1):
+    for i in range(plot_top_k):
         axis = axs[i]
-        axis.set_xticks([])
-        axis.set_yticks([])
-        axis.spines['right'].set_linewidth(0.0)
-        axis.spines['top'].set_linewidth(0.0)
-        axis.spines['left'].set_linewidth(0.0)
-        axis.spines['bottom'].set_linewidth(0.0)
+        _set_axis_config(axis,
+                         config_widths,
+                         clear_x_ticks=clear_x_ticks,
+                         clear_y_ticks=True)
         trans = mpl.transforms.blended_transform_factory(axis.transData, axis.transAxes)
         axis.plot([0.0, 1.0], [0.5, 0.5], transform=axis.transAxes,
                   linewidth=0.5, color='black', alpha=0.3, zorder=1)
         axis.plot([0.0, 0.0], [-1.0, 1.0], transform=trans, clip_on=False,
                   linewidth=0.5, color='black', alpha=0.3, zorder=1)
+
     axis = axs[-1]
-    axis.set_yticks([])
-    axis.spines['right'].set_linewidth(0.0)
-    axis.spines['top'].set_linewidth(0.0)
-    axis.spines['left'].set_linewidth(0.0)
-    axis.spines['bottom'].set_linewidth(0.5)
+    _set_axis_config(axis,
+                     [0.0, 0.0, 0.0, 0.5],
+                     clear_x_ticks=False,
+                     clear_y_ticks=True)
     trans = mpl.transforms.blended_transform_factory(axis.transData, axis.transAxes)
     axis.plot([0.0, 1.0], [0.5, 0.5], transform=axis.transAxes,
               linewidth=0.5, color='black', alpha=0.3, zorder=1)
