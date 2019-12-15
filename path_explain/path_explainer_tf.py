@@ -74,9 +74,9 @@ class PathExplainerTF(Explainer):
                              (1.0 - batch_product) * batch_baseline
 
         batch_gradients, batch_hessian = self.gradient_function(batch_interpolated,
-                                               output_index,
-                                               second_order=True,
-                                               interaction_index=interaction_index)
+                                                                output_index,
+                                                                second_order=True,
+                                                                interaction_index=interaction_index)
 
         ########################
         # This code is just preparing arrays to be the right shape for broadcasting.
@@ -103,10 +103,11 @@ class PathExplainerTF(Explainer):
                              batch_difference * diagonal_derivative
         return batch_attributions
 
-    def gradient_function(self, batch_input,
-                           output_index=None,
-                           second_order=False,
-                           interaction_index=None):
+    def gradient_function(self,
+                          batch_input,
+                          output_index=None,
+                          second_order=False,
+                          interaction_index=None):
         """
         A function to compute the gradients of a tensorflow model.
         If you want to use a custom gradient function, you
@@ -303,7 +304,7 @@ class PathExplainerTF(Explainer):
         return attributions
 
     def _get_test_output(self,
-                        inputs):
+                         inputs):
         """
         Internal helper function to get the
         output of a model. Designed to
@@ -489,7 +490,6 @@ class PathExplainerTF(Explainer):
                                                    use_expectation)
             batch_alpha = current_alpha[j:min(j + batch_size, num_samples)]
             batch_beta = current_beta[j:min(j + batch_size, num_samples)]
-            batch_product = batch_alpha * batch_beta
 
             reps = np.ones(len(current_input.shape)).astype(int)
             reps[0] = number_to_draw
@@ -505,6 +505,17 @@ class PathExplainerTF(Explainer):
         attribution_array = np.concatenate(attribution_array, axis=0)
         attributions = np.mean(attribution_array, axis=0)
         return attributions
+
+    def _clean_index(self, interaction_index):
+        """
+        Internal helper function.
+        """
+        if interaction_index is not None:
+            if isinstance(interaction_index, int):
+                interaction_index = [interaction_index]
+            else:
+                interaction_index = list(interaction_index)
+        return interaction_index
 
     def interactions(self, inputs, baseline,
                      batch_size=50, num_samples=100,
@@ -549,11 +560,8 @@ class PathExplainerTF(Explainer):
                                                                       output_indices,
                                                                       interaction_index,
                                                                       True)
-        if interaction_index is not None:
-            if isinstance(interaction_index, int):
-                interaction_index = [interaction_index]
-            else:
-                interaction_index = list(interaction_index)
+
+        interaction_index = self._clean_index(interaction_index)
 
         input_iterable = enumerate(inputs)
         if verbose:

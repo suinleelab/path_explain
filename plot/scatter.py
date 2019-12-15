@@ -5,6 +5,9 @@ across a dataset.
 import pandas as pd
 import numpy as np
 import altair as alt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from . import colors
 
 def _get_bounds(arr):
     """
@@ -27,7 +30,12 @@ def scatter_plot(attributions,
                  feature_index,
                  interactions=None,
                  color_by=None,
-                 feature_names=None):
+                 feature_names=None,
+                 scale_x_ind=False,
+                 scale_y_ind=False,
+                 figsize=5,
+                 dpi=150,
+                 **kwargs):
     """
     Function to draw an interactive scatter plot of
     attribution values. Since this is built on top
@@ -52,6 +60,13 @@ def scatter_plot(attributions,
                   same syntax as feature_index.
         feature_names: An optional list of length attributions.shape[1]. Each
                        entry should be a string representing the name of a feature.
+        scale_x_ind: Set to True to scale the x axes of each plot independently.
+                     Defaults to False.
+        scale_y_ind: Set to True to scale the y axes of each plot independently.
+                     Defaults to False.
+        figsize: Figure size in matplotlib units. Each figure will be square.
+        dpi: Resolution of each plot.
+        kwargs: passed to matplotlib.pyplot.scatter
     """
     if not isinstance(feature_index, int):
         if feature_names is None:
@@ -74,6 +89,7 @@ def scatter_plot(attributions,
         y_name: attributions[:, feature_index]
     })
 
+    color_name = None
     if color_by is not None:
         color_name = 'Value of {}'.format(feature_names[color_by])
         color_column = feature_values[:, color_by]
@@ -115,24 +131,103 @@ def scatter_plot(attributions,
         # WHY WE SHOULD SUBTRACT BY BOTH i,j entry and j,i
         # IN TERMS OF COMPLETENESS -
 
-        inter_chart = alt.Chart(inter_df).mark_point(filled=True, size=20).encode(
-            x=alt.X(x_name + ':Q'),
-            y=alt.Y(inter_name + ':Q'),
-            color=alt.Color(color_name + ':Q', scale=alt.Scale(scheme='goldgreen'))
-        )
+    if color_by is not None:
+        fig, axs = plt.subplots(1, 3, figsize=(3 * figsize + 1, figsize), dpi=dpi)
+    else:
+        fig, axis = plt.subplots(1, 1, figsize=(figsize, figsize), dpi=dpi)
+        axs = [axis]
 
-        main_chart = alt.Chart(inter_df).mark_point(filled=True, size=20).encode(
-            x=alt.X(x_name + ':Q'),
-            y=alt.Y(main_name + ':Q'),
-            color=alt.Color(color_name + ':Q', scale=alt.Scale(scheme='goldgreen'))
-        )
+    x_limits, y_limits = _get_shared_limits(data_df[x_name], data_df[y_name],
+                                            scale_x_ind, scale_y_ind)
 
-        chart = chart.properties(width=300, height=300) | \
-                inter_chart.properties(width=300, height=300) | \
-                main_chart.properties(width=300, height=300)
-        chart = chart.configure_axis(labelFontSize=14,
-                                     labelFontWeight=300,
-                                     titleFontSize=16,
-                                     titleFontWeight=400)
+    _single_scatter(axs[0], data_df, x_name, y_name, color_name, x_limits, y_limits, **kwargs)
+    if color_by is not None:
+        _single_scatter(axs[1], inter_df, x_name, inter_name,
+                        color_name, x_limits, y_limits, **kwargs)
+        _single_scatter(axs[2], inter_df, x_name, main_name,
+                        color_name, x_limits, y_limits, **kwargs)
+        _color_bar(fig, vmin, vmax, color_name, **kwargs)
 
-    return chart
+    fig.suptitle('Attributions to {}'.format(feature_names[feature_index]), fontsize=18)
+
+    return fig, axs
+
+def _get_shared_limits(data_x, data_y, scale_x_ind, scale_y_ind):
+    """
+    Helper function to get shared plot limits
+    """
+    x_limits = None
+    if not scale_x_ind:
+        x_limits = [np.min(data_x), np.max(data_x)]
+        x_range = x_limits[1] - x_limits[0]
+        x_limits[0] -= x_range * 0.05
+        x_limits[1] += x_range * 0.05
+
+    y_limits = None
+    if not scale_y_ind:
+        y_limits = [np.min(data_y), np.max(data_y)]
+        y_range = y_limits[1] - y_limits[0]
+        y_limits[0] -= y_range * 0.05
+        y_limits[1] += y_range * 0.05
+    return x_limits, y_limits
+
+def _color_bar(fig, vmin, vmax, color_name,
+               ticks=True,
+               label_size=14,
+               **kwargs):
+    """
+    Helper function. Creates the color bar.
+    """
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = colors.green_gold()
+
+    fig.subplots_adjust(right=0.88)
+    cbar_ax = fig.add_axes([0.9, 0.15, 0.01, 0.7])
+    color_bar = fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=vmin,
+                                                                             vmax=vmax),
+                                                   cmap=kwargs['cmap']),
+                             cax=cbar_ax,
+                             orientation='vertical')
+    color_bar.outline.set_visible(False)
+    if ticks:
+        cbar_ax.tick_params(length=6, labelsize=12)
+        labelpad = 20
+    else:
+        vrange = vmax - vmin
+        color_bar.set_ticks([vmin + vrange * 0.02, vmax - vrange * 0.02])
+        cbar_ax.tick_params(size=0)
+        cbar_ax.set_yticklabels(['Low', 'High'], fontsize=label_size)
+        labelpad = 0
+    color_bar.set_label(color_name, fontsize=label_size, rotation=270, labelpad=labelpad)
+
+def _single_scatter(axis, data, x_name, y_name, color_name=None,
+                    x_limits=None, y_limits=None, **kwargs):
+    """
+    Helper function. Generates a scatter plot with some custom
+    settings.
+    """
+    axis.spines['right'].set_linewidth(0.2)
+    axis.spines['top'].set_linewidth(0.2)
+    axis.spines['left'].set_linewidth(0.5)
+    axis.spines['bottom'].set_linewidth(0.5)
+
+    if 's' not in kwargs:
+        kwargs['s'] = 7
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = colors.green_gold()
+
+    if color_name is not None:
+        axis.scatter(x=data[x_name], y=data[y_name], c=data[color_name], **kwargs)
+    else:
+        axis.scatter(x=data[x_name], y=data[y_name], **kwargs)
+
+    axis.grid(linewidth=0.5)
+    axis.set_axisbelow(True)
+    axis.tick_params(length=6, labelsize=12)
+    axis.set_xlabel(x_name, fontsize=14)
+    axis.set_ylabel(y_name, fontsize=14)
+
+    if x_limits is not None:
+        axis.set_xlim(x_limits)
+    if y_limits is not None:
+        axis.set_ylim(y_limits)

@@ -2,27 +2,75 @@
 This module contains functions for plotting
 attributions on text data.
 """
+import string
 import altair as alt
 import numpy as np
 import pandas as pd
-import string
 
-def _string_width(st):
+def _string_width(in_string):
     """
     Returns the visual width (in pixels) of a string
     when displayed in arial 12pt font (roughly).
     """
     size = 0
-    for s in st:
-        if s in 'lij|\' ': size += 37
-        elif s in '![]fI.,:;/\\t': size += 50
-        elif s in '`-(){}r"': size += 60
-        elif s in '*^zcsJkvxy': size += 85
-        elif s in 'aebdhnopqug#$L+<>=?_~FZT' + string.digits: size += 95
-        elif s in 'BSPEAKVXY&UwNRCHD': size += 112
-        elif s in 'QGOMm%W@': size += 135
+    for char in in_string:
+        if char in 'lij|\' ':
+            size += 37
+        elif char in '![]fI.,:;/\\t':
+            size += 50
+        elif char in '`-(){}r"':
+            size += 60
+        elif char in '*^zcsJkvxy':
+            size += 85
+        elif char in 'aebdhnopqug#$L+<>=?_~FZT' + string.digits:
+            size += 95
+        elif char in 'BSPEAKVXY&UwNRCHD':
+            size += 112
+        elif char in 'QGOMm%W@':
+            size += 135
         else: size += 50
     return size * 6 / 1000.0
+
+def _join_tokens(tokens, attributions):
+    """
+    Internal function to join tokens encoded
+    in the huggingface tokenization style.
+
+    Args:
+        tokens: An array of strings.
+        attributions: A numpy array of importances.
+    """
+    joined_attributions = []
+    joined_tokens = []
+    current_string = ''
+    current_attribution = 0
+    found_special = False
+    add_last = False
+
+    for i, token in enumerate(tokens):
+        attr = attributions[i]
+        add_last = False
+        if token.startswith('##'):
+            current_string += token[2:]
+            current_attribution += attr
+        elif token in "'-":
+            current_string += token
+            current_attribution += attr
+            found_special = True
+        elif current_string == '' or found_special:
+            current_string += token
+            current_attribution += attr
+            found_special = False
+        else:
+            joined_tokens.append(current_string)
+            joined_attributions.append(current_attribution)
+            current_string = token
+            current_attribution = attr
+            add_last = True
+    if add_last:
+        joined_tokens.append(current_string)
+        joined_attributions.append(current_attribution)
+    return joined_tokens, joined_attributions
 
 def text_plot(tokens,
               attributions,
@@ -52,36 +100,7 @@ def text_plot(tokens,
         tokens = tokens[1:-1]
         attributions = attributions[1:-1]
 
-    joined_attributions = []
-    joined_tokens = []
-    current_string = ''
-    current_attribution = 0
-    found_special = False
-    add_last = False
-    for i in range(len(tokens)):
-        token = tokens[i]
-        attr  = attributions[i]
-        add_last = False
-        if token.startswith('##'):
-            current_string += token[2:]
-            current_attribution += attr
-        elif token == "'" or token == "-":
-            current_string += token
-            current_attribution += attr
-            found_special = True
-        elif current_string == '' or found_special:
-            current_string += token
-            current_attribution += attr
-            found_special = False
-        else:
-            joined_tokens.append(current_string)
-            joined_attributions.append(current_attribution)
-            current_string = token
-            current_attribution = attr
-            add_last = True
-    if add_last:
-        joined_tokens.append(current_string)
-        joined_attributions.append(current_attribution)
+    joined_tokens, joined_attributions = _join_tokens(tokens, attributions)
 
     data = pd.DataFrame({
         'Token': joined_tokens,
@@ -102,20 +121,20 @@ def text_plot(tokens,
     data['size'] = np.abs(data['Attributions'])
     base_width = 22 * np.sum(lengths)
     max_abs_attr = np.max(np.abs(data['Attributions']))
-    text = alt.Chart(data, width=base_width).mark_text(align='left',
-                                                       size=20,
-                                                       color='black',
-                                                       font='arial').encode(
-        x=alt.X('x:Q', sort=None, axis=None),
-        y=alt.value(0),
-        text=alt.Text('Token:N'),
-        color=alt.Color('Attributions:Q',
-                        legend=legend,
-                        scale=alt.Scale(scheme='redyellowgreen',
-                                        domain=[-max_abs_attr,
-                                                max_abs_attr]),
-                        sort=sort)
-    )
+    text = alt.Chart(data, width=base_width)
+    text = text.mark_text(align='left',
+                          size=20,
+                          color='black',
+                          font='arial')
+    text = text.encode(x=alt.X('x:Q', sort=None, axis=None),
+                       y=alt.value(0),
+                       text=alt.Text('Token:N'),
+                       color=alt.Color('Attributions:Q',
+                                       legend=legend,
+                                       scale=alt.Scale(scheme='redyellowgreen',
+                                                       domain=[-max_abs_attr,
+                                                               max_abs_attr]),
+                                       sort=sort))
     if not include_grid:
         text = text.configure_view(opacity=0.0)
     return text

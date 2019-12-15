@@ -4,7 +4,10 @@ in a summary plot.
 """
 import pandas as pd
 import numpy as np
-import altair as alt
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from .scatter import _get_bounds, _color_bar, _get_shared_limits
+from . import colors
 
 def _get_jitter_array(feature_values,
                       select_attributions):
@@ -42,7 +45,12 @@ def summary_plot(attributions,
                  interaction_feature=None,
                  feature_names=None,
                  plot_top_k=None,
-                 standardize_features=True):
+                 standardize_features=True,
+                 scale_x_ind=False,
+                 scale_y_ind=False,
+                 figsize=(8, 4),
+                 dpi=150,
+                 **kwargs):
     """
     Function to draw an interactive scatter plot of
     attribution values. Since this is built on top
@@ -63,7 +71,14 @@ def summary_plot(attributions,
         feature_names: An optional list of length attributions.shape[1]. Each
                        entry should be a string representing the name of a feature.
         plot_top_k: The number of features to plot. If none, will plot all features.
-                    This might take a while!
+                    This might take a while, depending on how many features you have.
+        scale_x_ind: Set to True to scale the x axes of each plot independently.
+                     Defaults to False.
+        scale_y_ind: Set to True to scale the y axes of each plot independently.
+                     Defaults to False.
+        figsize: Figure size in matplotlib units. Each figure will be square.
+        dpi: Resolution of each plot.
+        kwargs: Passed to plt.scatter
     """
     if plot_top_k is None:
         plot_top_k = attributions.shape[1]
@@ -84,18 +99,12 @@ def summary_plot(attributions,
                                                                 keepdims=True))
         standardized_feature_values = standardized_feature_values / \
                                       (np.std(standardized_feature_values,
-                                             axis=0,
-                                             keepdims=True) + 1e7)
+                                              axis=0,
+                                              keepdims=True) + 1e7)
     else:
         standardized_feature_values = feature_values
-    vmin = np.nanpercentile(standardized_feature_values, 5)
-    vmax = np.nanpercentile(standardized_feature_values, 95)
-    if vmin == vmax:
-        vmin = np.nanpercentile(standardized_feature_values, 1)
-        vmax = np.nanpercentile(standardized_feature_values, 99)
-        if vmin == vmax:
-            vmin = np.min(standardized_feature_values)
-            vmax = np.max(standardized_feature_values)
+
+    vmin, vmax = _get_bounds(standardized_feature_values)
     standardized_feature_values = np.clip(standardized_feature_values, vmin, vmax)
 
     attribution_names = ['Attribution to {}'.format(feature_names[i]) for \
@@ -126,30 +135,62 @@ def summary_plot(attributions,
     jitter_df = jitter_df.drop(columns=['Variable'])
     melted_df = pd.concat([feature_df, attribution_df, jitter_df], axis=1)
 
-    chart = alt.Chart(melted_df, width=400, height=40)
-    chart = chart.mark_point(filled=True, size=10)
-    chart = chart.encode(x=alt.X('Attribution Value:Q',
-                                 axis=alt.Axis(ticks=True,
-                                               grid=False,
-                                               labels=True)),
-                         y=alt.Y('Jitter:Q',
-                                 title=None,
-                                 scale=alt.Scale(),
-                                 axis=alt.Axis(values=[0],
-                                               ticks=True,
-                                               grid=True,
-                                               labels=False)
-                                ),
-                         color=alt.Color('Normalized Feature Value:Q',
-                                         legend=alt.Legend(direction='horizontal',
-                                                           orient='bottom'),
-                                         scale=alt.Scale(scheme='goldgreen')),
-                         row=alt.Row('Feature:N',
-                                     sort=feature_names,
-                                     header=alt.Header(labelAngle=0,
-                                                       labelAlign='right',
-                                                       labelPadding=3)))
+    if 's' not in kwargs:
+        kwargs['s'] = 4
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = colors.green_gold()
 
-    chart = chart.configure_facet(spacing=0)
-    chart = chart.configure_view(stroke=None)
-    return chart
+    x_limits, y_limits = _get_shared_limits(melted_df['Attribution Value'],
+                                            melted_df['Jitter'],
+                                            scale_x_ind,
+                                            scale_y_ind)
+
+    fig, axs = plt.subplots(plot_top_k, 1, figsize=figsize, dpi=dpi)
+    fig.subplots_adjust(left=0.2, hspace=0)
+    for i in range(plot_top_k - 1):
+        axis = axs[i]
+        axis.set_xticks([])
+        axis.set_yticks([])
+        axis.spines['right'].set_linewidth(0.0)
+        axis.spines['top'].set_linewidth(0.0)
+        axis.spines['left'].set_linewidth(0.0)
+        axis.spines['bottom'].set_linewidth(0.0)
+        trans = mpl.transforms.blended_transform_factory(axis.transData, axis.transAxes)
+        axis.plot([0.0, 1.0], [0.5, 0.5], transform=axis.transAxes,
+                  linewidth=0.5, color='black', alpha=0.3, zorder=1)
+        axis.plot([0.0, 0.0], [-1.0, 1.0], transform=trans, clip_on=False,
+                  linewidth=0.5, color='black', alpha=0.3, zorder=1)
+    axis = axs[-1]
+    axis.set_yticks([])
+    axis.spines['right'].set_linewidth(0.0)
+    axis.spines['top'].set_linewidth(0.0)
+    axis.spines['left'].set_linewidth(0.0)
+    axis.spines['bottom'].set_linewidth(0.5)
+    trans = mpl.transforms.blended_transform_factory(axis.transData, axis.transAxes)
+    axis.plot([0.0, 1.0], [0.5, 0.5], transform=axis.transAxes,
+              linewidth=0.5, color='black', alpha=0.3, zorder=1)
+    axis.plot([0.0, 0.0], [0.0, 1.0], transform=trans,
+              linewidth=0.5, color='black', alpha=0.3, zorder=1)
+    axis.tick_params(length=4, labelsize=8)
+    axis.set_xlabel('Attribution Value')
+
+    for i in range(plot_top_k):
+        axis = axs[i]
+        selected_df = melted_df.loc[melted_df['Feature'] == feature_names[i]]
+        trans = mpl.transforms.blended_transform_factory(axis.transAxes, axis.transAxes)
+        axis.text(-0.02, 0.5, feature_names[i],
+                  horizontalalignment='right',
+                  verticalalignment='center',
+                  fontsize=8,
+                  transform=trans)
+        axis.scatter(x=selected_df['Attribution Value'],
+                     y=selected_df['Jitter'],
+                     c=selected_df['Normalized Feature Value'],
+                     zorder=2,
+                     **kwargs)
+        if x_limits is not None:
+            axis.set_xlim(x_limits)
+        if y_limits is not None:
+            axis.set_ylim(y_limits)
+
+    _color_bar(fig, vmin, vmax, 'Feature Value', ticks=False, label_size=8, **kwargs)

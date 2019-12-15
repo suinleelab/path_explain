@@ -9,16 +9,6 @@ class Explainer():
     package in terms of API.
     """
 
-    def __init__(self,
-                 model,
-                 gradient_function=None):
-        """
-        Initialize the explainer class.
-        """
-        raise Exception("Initialization has not been implemented " + \
-                    "for this class. Likely, you have imported " + \
-                    "the wrong class from this package.")
-
     def attributions(self,
                      inputs,
                      baseline,
