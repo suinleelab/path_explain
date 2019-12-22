@@ -230,15 +230,18 @@ class PathExplainerTF(Explainer):
         """
         if use_expectation:
             if use_product:
-                alpha = np.random.uniform(low=0.0, high=1.0, size=num_samples)
-                beta = np.random.uniform(low=0.0, high=1.0, size=num_samples)
+                alpha = np.random.uniform(low=0.0, high=1.0, size=num_samples).astype(np.float32)
+                beta = np.random.uniform(low=0.0, high=1.0, size=num_samples).astype(np.float32)
                 return alpha, beta
             else:
-                return np.random.uniform(low=0.0, high=1.0, size=num_samples)
+                return np.random.uniform(low=0.0, high=1.0, size=num_samples).astype(np.float32)
         else:
             if use_product:
                 sqrt_samples = np.ceil(np.sqrt(num_samples)).astype(int)
-                spaced_points = np.linspace(start=0.0, stop=1.0, num=sqrt_samples, endpoint=True)
+                spaced_points = np.linspace(start=0.0,
+                                            stop=1.0,
+                                            num=sqrt_samples,
+                                            endpoint=True).astype(np.float32)
 
                 num_drawn = sqrt_samples * sqrt_samples
                 slice_indices = np.round(np.linspace(start=0.0,
@@ -246,7 +249,7 @@ class PathExplainerTF(Explainer):
                                                      num=num_samples,
                                                      endpoint=True)).astype(int)
 
-                ones_map = np.ones(sqrt_samples)
+                ones_map = np.ones(sqrt_samples).astype(np.float32)
                 beta = np.outer(spaced_points, ones_map).flatten()
                 beta = beta[slice_indices]
 
@@ -255,7 +258,10 @@ class PathExplainerTF(Explainer):
 
                 return alpha, beta
             else:
-                return np.linspace(start=0.0, stop=1.0, num=num_samples, endpoint=True)
+                return np.linspace(start=0.0,
+                                   stop=1.0,
+                                   num=num_samples,
+                                   endpoint=True).astype(np.float32)
 
     def _single_attribution(self, current_input, current_baseline,
                             current_alphas, num_samples, batch_size,
@@ -333,8 +339,9 @@ class PathExplainerTF(Explainer):
         num_classes = test_output.shape[-1]
 
         if as_interactions and interaction_index is None:
-            shape_tuple = (inputs.shape[0], ) + \
-                          2 * (inputs.shape[1:])
+            shape_tuple = [inputs.shape[0], ] + \
+                          list(2 * inputs.shape[1:])
+            shape_tuple = tuple(shape_tuple)
 
         if is_multi_output and output_indices is None:
             num_classes = test_output.shape[-1]

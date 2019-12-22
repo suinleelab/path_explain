@@ -72,12 +72,12 @@ class BertExplainerTF(PathExplainerTF):
         batch_embedding = self.model.bert.embeddings([batch_ids,
                                                       None,
                                                       batch_token_types])
-        batch_embedding = tf.cast(batch_embedding, tf.float64)
+        batch_embedding = tf.cast(batch_embedding, tf.float32)
         baseline_ids = tf.cast(batch_baseline, tf.int64)
         baseline_embedding = self.model.bert.embeddings([baseline_ids,
                                                          None,
                                                          batch_token_types])
-        baseline_embedding = tf.cast(baseline_embedding, tf.float64)
+        baseline_embedding = tf.cast(baseline_embedding, tf.float32)
 
         if not second_order:
             # Add a dimension to account for the embedding dimension
