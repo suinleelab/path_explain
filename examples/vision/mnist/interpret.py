@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
+from joblib import dump, load
 from sklearn.decomposition import PCA
-from train import load_mnist
+from train import load_mnist, build_model
 
 from path_explain.path_explainer_tf import PathExplainerTF
 from path_explain.utils import set_up_environment
@@ -30,6 +31,7 @@ def interpret(argv=None):
         reshaped_x_train = np.reshape(x_train, (x_train.shape[0], -1))
         pca_model = PCA()
         pca_model.fit(reshaped_x_train)
+        dump(pca_model, 'pca_model.pickle')
 
         transformed_x_train = pca_model.transform(reshaped_x_train).astype(np.float32)
         baseline = transformed_x_train
@@ -41,7 +43,8 @@ def interpret(argv=None):
         transformed_x_test = x_test
 
     print('Loading model...')
-    original_model = tf.keras.models.load_model('model.h5')
+    original_model = build_model(for_interpretation=True)
+    original_model.load_weights('model.h5', by_name=True)
 
     if FLAGS.interpret_pca:
         interpret_model = tf.keras.models.Sequential()

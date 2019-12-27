@@ -1,3 +1,4 @@
+*.pickle
 *.json
 *.h5
 *data/

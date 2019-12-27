@@ -7,7 +7,7 @@ from tqdm import tqdm
 from path_explain.path_explainer_tf import PathExplainerTF
 from path_explain import utils
 from train import load_data
-from model import cnn_model
+from model import cnn_model, lstm_model
 
 from absl import app
 from absl import flags
@@ -15,10 +15,12 @@ from absl import flags
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_samples', 300, 'Number of samples to draw for attributions')
 flags.DEFINE_integer('num_sentences', 100, 'Number of sentences to interpret')
+flags.DEFINE_string('visible_devices', '0', 'GPU to use')
 
 def interpret(argv=None):
     print('Setting up environment...')
-    utils.set_up_environment(visible_devices='0')
+    utils.set_up_environment(visible_devices=FLAGS.visible_devices)
+
     print('Loading data...')
     x_train, y_train, x_test, y_test, vocabulary_inv = load_data(FLAGS.max_words, FLAGS.sequence_length)
 
@@ -49,9 +51,7 @@ def interpret(argv=None):
     model = tf.keras.models.load_model('{}.h5'.format(FLAGS.model_type))
     embedding_model = tf.keras.models.Model(model.input, model.layers[1].output)
 
-    interpret_model = cnn_model(len(vocabulary_inv),
-                                for_interpretation=True)
-    interpret_model.load_weights('model.h5', by_name=True)
+    interpret_model.load_weights('{}.h5'.format(FLAGS.model_type), by_name=True)
 
     explainer = PathExplainerTF(interpret_model)
 
@@ -83,15 +83,26 @@ def interpret(argv=None):
                                    FLAGS.sequence_length,
                                    FLAGS.embedding_dim))
 
-    embedding_interactions = explainer.interactions(batch_embedding,
-                                                    baseline_embedding,
-                                                    batch_size=FLAGS.batch_size,
-                                                    num_samples=FLAGS.num_samples,
-                                                    use_expectation=False,
-                                                    output_indices=0,
-                                                    verbose=True)
-    np.save('embedding_interactions_{}.npy'.format(FLAGS.model_type),
-            embedding_interactions)
+    indices = np.indices((max_indices,
+                          FLAGS.embedding_dim))
+    indices = indices.reshape(2, -1)
+    indices = indices.swapaxes(0, 1)
+    for interaction_index in tqdm(indices):
+        embedding_interactions = explainer.interactions(batch_embedding,
+                                                        baseline_embedding,
+                                                        batch_size=FLAGS.batch_size,
+                                                        num_samples=FLAGS.num_samples,
+                                                        use_expectation=False,
+                                                        output_indices=0,
+                                                        verbose=False,
+                                                        interaction_index=interaction_index)
+        interaction_matrix[:,
+                           interaction_index[0],
+                           interaction_index[1],
+                           :,
+                           :] = embedding_interactions
+    np.save('interaction_matrix_{}.npy'.format(FLAGS.model_type),
+            interaction_matrix)
 
 if __name__ == '__main__':
     app.run(interpret)
