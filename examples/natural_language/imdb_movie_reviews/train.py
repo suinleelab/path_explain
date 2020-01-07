@@ -21,7 +21,7 @@ flags.DEFINE_integer('hidden_units', 50, 'Number of hidden units')
 flags.DEFINE_integer('num_filters',  32, 'Number of convolutional filters of each size')
 flags.DEFINE_integer('embedding_dim', 32, 'Size of the embedding')
 flags.DEFINE_float('dropout_rate', 0.5, 'Fraction of inputs to set to 0 during training')
-flags.DEFINE_float('learning_rate', 0.001, 'Fraction of inputs to set to 0 during training')
+flags.DEFINE_float('learning_rate', 0.001, 'Learning rate to use while training')
 flags.DEFINE_string('model_type', 'cnn', 'One of `lstm`, `cnn`.')
 
 

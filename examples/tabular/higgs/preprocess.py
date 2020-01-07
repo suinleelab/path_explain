@@ -53,7 +53,6 @@ def higgs_dataset(batch_size=1000,
     dataset = tfds.load(name='higgs', split='train')
     dataset = dataset.map(lambda x: _read_item(x, scaler=scaler),
                           num_parallel_calls=num_parallel_calls)
-    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
 
     if include_vald:
         train_set = dataset.take(10000000)

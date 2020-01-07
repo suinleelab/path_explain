@@ -10,24 +10,21 @@ from absl import app
 from absl import flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('num_layers', 4, 'Number of dense layers')
+flags.DEFINE_integer('num_layers', 5, 'Number of dense layers')
 flags.DEFINE_integer('hidden_units', 300, 'Number of units in each dense layer')
-flags.DEFINE_integer('batch_size', 1000, 'Batch size to use while training')
+flags.DEFINE_integer('batch_size', 100, 'Batch size to use while training')
 flags.DEFINE_integer('epochs', 200, 'Maximum number of epochs to train for')
 flags.DEFINE_string('visible_devices', '0', 'Which gpu to use')
-flags.DEFINE_float('dropout_rate', 0.25, 'Probability of dropping out a unit while training')
-flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate to use for training')
-flags.DEFINE_float('decay_rate', 0.98, 'Amount to decay the learning rate every epoch')
+flags.DEFINE_float('weight_decay', 1e-5, 'Amount of weight decay on each weight')
+flags.DEFINE_float('learning_rate', 0.05, 'Initial learning rate to use for training')
+flags.DEFINE_float('decay_rate', 0.96, 'Amount to decay the learning rate every epoch')
 flags.DEFINE_float('momentum', 0.9, 'Momentum to use for SGD while training')
 
-def build_model(dropout_rate=0.25,
-                num_layers=4,
+def build_model(weight_decay=1e-5,
+                num_layers=5,
                 hidden_units=300,
                 for_interpretation=False):
-    if for_interpretation:
-        activation = tf.keras.activations.softplus
-    else:
-        activation = tf.keras.activations.relu
+    activation = tf.keras.activations.tanh
 
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Input(shape=(28,),
@@ -37,10 +34,8 @@ def build_model(dropout_rate=0.25,
     for i in range(num_layers):
         model.add(tf.keras.layers.Dense(units=hidden_units,
                                         activation=activation,
+                                        kernel_regularizer=tf.keras.regularizers.l2(l=weight_decay),
                                         name=f'dense_{i}'))
-        model.add(tf.keras.layers.BatchNormalization(name=f'batchnorm_{i}'))
-        model.add(tf.keras.layers.Dropout(rate=dropout_rate,
-                                          name=f'dropout_{i}'))
 
     model.add(tf.keras.layers.Dense(units=1,
                                     activation=None,
@@ -61,7 +56,7 @@ def train(argv=None):
                                                   scale=True,
                                                   include_vald=True)
 
-    model = build_model(dropout_rate=FLAGS.dropout_rate,
+    model = build_model(weight_decay=FLAGS.weight_decay,
                         num_layers=FLAGS.num_layers,
                         hidden_units=FLAGS.hidden_units,
                         for_interpretation=False)

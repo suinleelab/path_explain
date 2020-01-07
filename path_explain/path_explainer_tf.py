@@ -340,7 +340,7 @@ class PathExplainerTF(Explainer):
 
         if as_interactions and interaction_index is None:
             shape_tuple = [inputs.shape[0], ] + \
-                          list(2 * inputs.shape[1:])
+                          2 * list(inputs.shape[1:])
             shape_tuple = tuple(shape_tuple)
 
         if is_multi_output and output_indices is None:

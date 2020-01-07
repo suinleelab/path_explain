@@ -7,7 +7,7 @@ from absl import flags
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('batch_size', 128, 'Batch size for training')
 flags.DEFINE_integer('num_epochs', 10, 'Number of epochs to train for')
-flags.DEFINE_float('learning_rate', 0.01, 'Learning rate for SGD')
+flags.DEFINE_float('learning_rate', 0.001, 'Learning rate for SGD')
 
 def build_model(for_interpretation=False):
     activation_function = tf.keras.activations.relu
@@ -23,26 +23,21 @@ def build_model(for_interpretation=False):
                                      padding='same',
                                      activation=activation_function,
                                      name='conv1'))
-    model.add(tf.keras.layers.BatchNormalization(name='batch_norm1'))
-    model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2),
-                                           name='pool1'))
-
     model.add(tf.keras.layers.Conv2D(64, (3, 3),
                                      padding='same',
                                      activation=activation_function,
                                      name='conv2'))
-    model.add(tf.keras.layers.BatchNormalization(name='batch_norm2'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2),
-                                           name='pool2'))
+                                           name='pool'))
 
+    model.add(tf.keras.layers.Dropout(0.25, name='dropout1'))
     model.add(tf.keras.layers.Flatten(name='flatten'))
-    model.add(tf.keras.layers.Dense(1024,
+    model.add(tf.keras.layers.Dense(128,
                                     activation=activation_function,
                                     name='dense'))
-    model.add(tf.keras.layers.BatchNormalization(name='batch_norm3'))
 
     model.add(tf.keras.layers.Dropout(0.5,
-                                      name='dropout'))
+                                      name='dropout2'))
     model.add(tf.keras.layers.Dense(10, name='dense_out'))
 
     if not for_interpretation:
@@ -64,7 +59,7 @@ def train(argv=None):
     (x_train, y_train), (x_test, y_test) = load_mnist()
 
     model = build_model()
-    optimizer = tf.keras.optimizers.SGD(learning_rate=FLAGS.learning_rate)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
     loss = tf.keras.losses.SparseCategoricalCrossentropy()
     metrics = [tf.keras.metrics.SparseCategoricalAccuracy()]
 

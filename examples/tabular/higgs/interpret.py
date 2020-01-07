@@ -1,10 +1,10 @@
-
 import tensorflow as tf
 import numpy as np
 from path_explain.utils import set_up_environment
 from path_explain.path_explainer_tf import PathExplainerTF
 
 from preprocess import higgs_dataset
+from train import build_model
 
 from absl import app
 from absl import flags
@@ -24,7 +24,7 @@ def interpret(argv=None):
                                                   include_vald=True)
 
     print('Loading model...')
-    model = build_model(dropout_rate=FLAGS.dropout_rate,
+    model = build_model(weight_decay=FLAGS.weight_decay,
                         num_layers=FLAGS.num_layers,
                         hidden_units=FLAGS.hidden_units,
                         for_interpretation=True)
@@ -33,7 +33,7 @@ def interpret(argv=None):
     print('Gathering inputs...')
     training_iters = int(10000 / FLAGS.batch_size)
     training_samples = []
-    for i, (x_batch, _) in train_set:
+    for i, (x_batch, _) in enumerate(train_set):
         training_samples.append(x_batch)
         if i > training_iters:
             break
@@ -41,11 +41,14 @@ def interpret(argv=None):
 
     test_iters = int(FLAGS.num_examples / FLAGS.batch_size)
     input_samples = []
-    for i, (x_batch, _) in test_set:
+    for i, (x_batch, _) in enumerate(test_set):
         input_samples.append(x_batch)
         if i > test_iters:
             break
-    input_samples = tf.concat(test_samples, axis=0)
+
+    input_samples = tf.concat(input_samples, axis=0)
+
+    np.save('input_samples', input_samples.numpy())
 
     explainer = PathExplainerTF(model)
     print('Computing attributions...')
