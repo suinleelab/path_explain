@@ -125,9 +125,6 @@ def scatter_plot(attributions,
             inter_name: interaction_column,
             main_name:  attributions[:, feature_index] - interaction_column
         })
-        # TODO: WHY DO WE MULTIPLY BY TWO ABOVE? THINK ABOUT
-        # WHY WE SHOULD SUBTRACT BY BOTH i,j entry and j,i
-        # IN TERMS OF COMPLETENESS -
 
     if color_by is not None:
         fig, axs = plt.subplots(1, 3, figsize=(3 * figsize + 1, figsize), dpi=dpi)

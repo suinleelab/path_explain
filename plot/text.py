@@ -2,7 +2,6 @@
 This module contains functions for plotting
 attributions on text data.
 """
-import string
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -25,14 +24,18 @@ def text_plot(word_array,
     """
     figsize = (0.1, 0.1)
     if include_legend:
-        figsize=(10, 2)
+        figsize = (10, 2)
 
     fig = plt.figure(figsize=figsize)
-    ax = fig.gca()
+    axis = fig.gca()
     plt.axis('off')
-    t = ax.transData
+    axis_transform = axis.transData
 
-    space_text = plt.text(x=0.0, y=1.0, s='   ', transform=t, **kwargs)
+    space_text = plt.text(x=0.0,
+                          y=1.0,
+                          s='   ',
+                          transform=axis_transform,
+                          **kwargs)
     space_text.draw(fig.canvas.get_renderer())
     space_bounds = space_text.get_window_extent()
 
@@ -57,11 +60,13 @@ def text_plot(word_array,
                         y=0.5,
                         s='{}'.format(word),
                         backgroundcolor=color,
-                        transform=t,
+                        transform=axis_transform,
                         **kwargs)
         text.draw(fig.canvas.get_renderer())
         ex = text.get_window_extent()
-        t = mpl.transforms.offset_copy(text._transform, x=ex.width + space_bounds.width, units='dots')
+        axis_transform = mpl.transforms.offset_copy(text._transform,
+                                                    x=ex.width + space_bounds.width,
+                                                    units='dots')
 
     if include_legend:
         fig.subplots_adjust(bottom=0.2)

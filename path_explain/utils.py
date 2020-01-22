@@ -34,7 +34,17 @@ def set_up_environment(mem_frac=None, visible_devices=None, min_log_level='3'):
         except RuntimeError as error:
             print(error)
 
-def softplus_activation(beta):
-    def softplus(x):
-        return (1.0 / beta) * tf.keras.backend.log(1.0 + tf.keras.backend.exp(beta * x))
+def softplus_activation(beta=1.0):
+    """
+    Returns a callable function
+    representing softplus activation
+    with beta smoothing.
+
+    Args:
+        beta: The smoothing parameter. Smaller means smoother.
+    """
+    def softplus(batch_x):
+        return (1.0 / beta) * tf.keras.backend.log(1.0 + \
+               tf.keras.backend.exp(-1.0 * tf.keras.backend.abs(beta * batch_x))) + \
+               tf.keras.backend.maximum(batch_x, 0)
     return softplus

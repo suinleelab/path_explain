@@ -10,9 +10,9 @@ from absl import app
 from absl import flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('batch_size', 8, 'Batch size for training')
+flags.DEFINE_integer('batch_size', 32, 'Batch size for interpretation')
 flags.DEFINE_integer('num_examples', 100, 'Number of examples per class to explain')
-flags.DEFINE_integer('num_samples', 200, 'Number of samples to draw when computing attributions')
+flags.DEFINE_integer('num_samples',  200, 'Number of samples to draw when computing attributions')
 flags.DEFINE_string('visible_devices', '0', 'Which gpu to train on')
 
 def interpret(argv=None):

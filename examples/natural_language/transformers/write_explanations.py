@@ -17,6 +17,7 @@ flags.DEFINE_integer('num_samples', 256, 'Number of samples to draw when computi
 flags.DEFINE_integer('max_length',  128, 'The maximum length of any sequence')
 flags.DEFINE_boolean('get_attributions', False, 'Set to true to generate attributions')
 flags.DEFINE_boolean('get_interactions', False, 'Set to true to generate interactions')
+flags.DEFINE_boolean('custom_sentences', False, 'Set to true to explain a list of custom sentences')
 
 def _get_tfds_task(task):
     """
@@ -41,19 +42,55 @@ def interpret(argv=None):
     model = TFDistilBertForSequenceClassification.from_pretrained(file,
                                                             config=config)
 
-    print('Loading data...')
-    data, info = tensorflow_datasets.load(f'glue/{_get_tfds_task(FLAGS.task)}',
-                                          with_info=True)
 
-    valid_dataset = glue_convert_examples_to_features(data['validation'],
-                                                      tokenizer,
-                                                      max_length=FLAGS.max_length,
-                                                      task=FLAGS.task)
-    valid_dataset = valid_dataset.batch(32)
+    if FLAGS.custom_sentences:
+        print('Tokenizing custom sentences...')
+        sentences = [
+            'This movie was bad',
+            'This movie was not bad',
+            'A movie',
+            'A bad movie',
+            'A bad, terrible movie',
+            'A bad, terrible, awful movie',
+            'A bad, terrible, awful, horrible movie'
+        ]
 
-    for batch in valid_dataset.take(1):
-        batch_input = batch[0]
-        batch_labels = batch[1]
+        input_ids_all = []
+        token_type_ids_all = []
+        attention_mask_all = []
+
+        for sentence in sentences:
+            encoded_sentence = tokenizer.encode_plus(sentence,
+                                                     add_special_tokens=True,
+                                                     return_tensors='tf',
+                                                     pad_to_max_length=True,
+                                                     max_length=FLAGS.max_length)
+            input_ids = encoded_sentence['input_ids']
+            token_type_ids = encoded_sentence['token_type_ids']
+            attention_mask = encoded_sentence['attention_mask']
+
+            input_ids_all.append(input_ids)
+            token_type_ids_all.append(token_type_ids)
+            attention_mask_all.append(attention_mask)
+
+        batch_input = {
+            'input_ids': tf.concat(input_ids_all, axis=0),
+            'token_type_ids': tf.concat(token_type_ids_all, axis=0),
+            'attention_mask': tf.concat(attention_mask_all, axis=0)
+        }
+    else:
+        print('Loading data...')
+        data, info = tensorflow_datasets.load(f'glue/{_get_tfds_task(FLAGS.task)}',
+                                              with_info=True)
+
+        valid_dataset = glue_convert_examples_to_features(data['validation'],
+                                                          tokenizer,
+                                                          max_length=FLAGS.max_length,
+                                                          task=FLAGS.task)
+        valid_dataset = valid_dataset.batch(32)
+
+        for batch in valid_dataset.take(1):
+            batch_input = batch[0]
 
     def embedding_model(batch_ids):
         batch_embedding = model.distilbert.embeddings(batch_ids)
@@ -93,7 +130,11 @@ def interpret(argv=None):
                                               use_expectation=False,
                                               output_indices=output_index,
                                               verbose=True)
-        np.save(f'{_get_tfds_task(FLAGS.task)}/attributions.npy', attributions)
+
+        if FLAGS.custom_sentences:
+            np.save(f'{_get_tfds_task(FLAGS.task)}/attributions_custom.npy', attributions)
+        else:
+            np.save(f'{_get_tfds_task(FLAGS.task)}/attributions.npy', attributions)
 
     if FLAGS.get_interactions:
         print('Getting interactions...')
@@ -104,7 +145,10 @@ def interpret(argv=None):
                                               use_expectation=False,
                                               output_indices=output_index,
                                               verbose=True)
-        np.save(f'{_get_tfds_task(FLAGS.task)}/interactions.npy', interactions)
+        if FLAGS.custom_sentences:
+            np.save(f'{_get_tfds_task(FLAGS.task)}/interactions_custom.npy', interactions)
+        else:
+            np.save(f'{_get_tfds_task(FLAGS.task)}/interactions.npy', interactions)
 
 
 if __name__ == '__main__':

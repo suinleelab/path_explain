@@ -79,7 +79,8 @@ class PathExplainerTF(Explainer):
 
         batch_alpha, batch_beta = batch_alphas
         batch_difference = batch_input - batch_baseline
-        batch_interpolated_beta = batch_beta * batch_input + (1.0 - batch_beta) * batch_baseline
+        batch_interpolated_beta = batch_beta * batch_input + \
+                                  (1.0 - batch_beta) * batch_baseline
 
         ################################################
         # Handle the second order derivatives here
@@ -87,7 +88,8 @@ class PathExplainerTF(Explainer):
             second_order_tape.watch(batch_interpolated_beta)
 
             batch_difference_beta = batch_interpolated_beta - batch_baseline
-            batch_interpolated_alpha = batch_alpha * batch_interpolated_beta + (1.0 - batch_alpha) * batch_baseline
+            batch_interpolated_alpha = batch_alpha * batch_interpolated_beta + \
+                                       (1.0 - batch_alpha) * batch_baseline
             with tf.GradientTape() as first_order_tape:
                 first_order_tape.watch(batch_interpolated_alpha)
 
@@ -105,7 +107,8 @@ class PathExplainerTF(Explainer):
         if interaction_index is not None:
             # In this case, the hessian is the same size as the input because we
             # indexed into a particular gradient
-            batch_hessian = second_order_tape.gradient(batch_gradients, batch_interpolated_beta)
+            batch_hessian = second_order_tape.gradient(batch_gradients,
+                                                       batch_interpolated_beta)
         else:
             # In this case, the hessian matrix duplicates the dimensionality of the
             # input. That is, if we have 5 CIFAR10 images for example, the
@@ -113,7 +116,8 @@ class PathExplainerTF(Explainer):
             # shape [5, 32, 32, 3, 32, 32, 3]. This can
             # be very memory intesive - there are other strategies,
             # but this one sacrifices memory to be fast
-            batch_hessian = second_order_tape.batch_jacobian(batch_gradients, batch_interpolated_beta)
+            batch_hessian = second_order_tape.batch_jacobian(batch_gradients,
+                                                             batch_interpolated_beta)
         ################################################
 
         ########################
