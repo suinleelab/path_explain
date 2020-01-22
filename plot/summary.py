@@ -157,11 +157,10 @@ def summary_plot(attributions,
 
     fig, axs = plt.subplots(plot_top_k, 1, figsize=figsize, dpi=dpi)
     fig.subplots_adjust(left=0.2, hspace=0)
-    for i in range(plot_top_k):
+    for i in range(plot_top_k - 1):
         axis = axs[i]
         _set_axis_config(axis,
-                         config_widths,
-                         clear_x_ticks=clear_x_ticks,
+                         clear_x_ticks=True,
                          clear_y_ticks=True)
         trans = mpl.transforms.blended_transform_factory(axis.transData, axis.transAxes)
         axis.plot([0.0, 1.0], [0.5, 0.5], transform=axis.transAxes,

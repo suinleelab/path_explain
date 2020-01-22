@@ -18,6 +18,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('batch_size', 32, 'Batch size for training')
 flags.DEFINE_float('learning_rate', 3e-5, 'Learning rate for training')
 flags.DEFINE_float('epsilon', 1e-8, 'Epsilon to use for ADAM optimization')
+flags.DEFINE_integer('hidden_size', 60, 'Size of the embedding layer')
 flags.DEFINE_integer('max_length', 128, 'The maximum length of any sequence')
 flags.DEFINE_integer('buffer_size', 128, 'Buffer size for dataset shuffling')
 flags.DEFINE_boolean('use_xla', False, 'Whether or not to use XLA acceleration')
@@ -57,7 +58,9 @@ def train(argv=None):
 
     # Load tokenizer and model from pretrained model/vocabulary.
     # Specify the number of labels to classify (2+: classification, 1: regression)
-    config = BertConfig.from_pretrained("bert-base-cased", num_labels=num_labels)
+    config = BertConfig.from_pretrained("bert-base-cased",
+                                        num_labels=num_labels,
+                                        hidden_size=FLAGS.hidden_size)
     tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     model = TFBertForSequenceClassification.from_pretrained('bert-base-cased', config=config)
 
@@ -117,7 +120,7 @@ def train(argv=None):
 
     # Save TF2 model
 
-    os.makedirs(model_path, exist_ok=True)
+#     os.makedirs(model_path, exist_ok=True)
     model.save_pretrained(model_path)
 
 if __name__ == '__main__':

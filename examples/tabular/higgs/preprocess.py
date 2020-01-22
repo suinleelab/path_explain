@@ -21,12 +21,20 @@ def _compute_scaling():
     return scaler
 
 def _read_item(item,
-               scaler=None):
+               scaler=None,
+               flip_indices=False):
     label = item['class_label']
     label = tf.cast(label, tf.int64)
     del item['class_label']
 
     features = list(item.values())
+    if flip_indices:
+        m_wbb = features[24]
+        m_wwbb = features[25]
+
+        features[24] = m_wwbb
+        features[25] = m_wbb
+
     features = tf.stack(features, axis=0)
     features = tf.cast(features, tf.float32)
 
@@ -41,7 +49,8 @@ def higgs_dataset(batch_size=1000,
                   buffer_size=10000,
                   seed=0,
                   scale=True,
-                  include_vald=True):
+                  include_vald=True,
+                  flip_indices=False):
     if scale:
         try:
             scaler = load('scaler.pickle')
@@ -51,7 +60,7 @@ def higgs_dataset(batch_size=1000,
         scaler=None
 
     dataset = tfds.load(name='higgs', split='train')
-    dataset = dataset.map(lambda x: _read_item(x, scaler=scaler),
+    dataset = dataset.map(lambda x: _read_item(x, scaler=scaler, flip_indices=flip_indices),
                           num_parallel_calls=num_parallel_calls)
 
     if include_vald:

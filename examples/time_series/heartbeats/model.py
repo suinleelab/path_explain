@@ -4,13 +4,14 @@ https://www.kaggle.com/coni57/model-from-arxiv-1805-00794
 """
 
 import tensorflow as tf
+from path_explain.utils import softplus_activation
 
 def cnn_model(signal_length=187,
               num_signals=1,
               for_interpretation=False):
     activation_function = tf.keras.activations.relu
     if for_interpretation:
-        activation_function = tf.keras.activations.softplus
+        activation_function = softplus_activation(beta=10.0)
 
     inp = tf.keras.layers.Input(shape=(signal_length, num_signals), name='input')
     C   = tf.keras.layers.Conv1D(filters=32, kernel_size=5, strides=1, name='C')(inp)

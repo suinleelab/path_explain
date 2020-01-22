@@ -4,7 +4,6 @@ across a dataset.
 """
 import pandas as pd
 import numpy as np
-import altair as alt
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from . import colors
@@ -57,10 +56,8 @@ def scatter_plot(attributions,
                  dpi=150,
                  **kwargs):
     """
-    Function to draw an interactive scatter plot of
-    attribution values. Since this is built on top
-    of altair, this function works best when the
-    number of points is small (< 5000).
+    Function to draw a scatter plot of
+    attribution values.
 
     Args:
         attributions: A matrix of attributions.
@@ -109,16 +106,6 @@ def scatter_plot(attributions,
 
         data_df[color_name] = color_column
 
-    chart = alt.Chart(data_df).mark_point(filled=True, size=20).encode(
-        x=alt.X(x_name + ':Q'),
-        y=alt.Y(y_name + ':Q')
-    )
-
-    if color_by is not None:
-        chart = chart.encode(
-            color=alt.Color(color_name + ':Q', scale=alt.Scale(scheme='goldgreen'))
-        )
-
     if interactions is not None:
         if color_by is None:
             raise ValueError('Provided interactions but argument ' + \
@@ -158,6 +145,7 @@ def scatter_plot(attributions,
         _single_scatter(axs[2], inter_df, x_name, main_name,
                         color_name, x_limits, y_limits, **kwargs)
         _color_bar(fig, vmin, vmax, color_name, **kwargs)
+        fig.subplots_adjust(wspace=0.27)
 
     fig.suptitle('Attributions to {}'.format(feature_names[feature_index]), fontsize=18)
 

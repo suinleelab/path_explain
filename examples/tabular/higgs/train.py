@@ -20,6 +20,9 @@ flags.DEFINE_float('learning_rate', 0.05, 'Initial learning rate to use for trai
 flags.DEFINE_float('decay_rate', 0.96, 'Amount to decay the learning rate every epoch')
 flags.DEFINE_float('momentum', 0.9, 'Momentum to use for SGD while training')
 
+flags.DEFINE_boolean('evaluate', False, 'Set to true to evaluate the model instead of training')
+flags.DEFINE_boolean('flip_indices', False, 'Set to true to flip the indices of m_wbb and m_wwbb')
+
 def build_model(weight_decay=1e-5,
                 num_layers=5,
                 hidden_units=300,
@@ -42,7 +45,7 @@ def build_model(weight_decay=1e-5,
                                     name='dense_out'))
 
     if not for_interpretation:
-        model.add(tf.keras.layers.Activation(tf.keras.activations.sigmoid,
+        model.add(tf.keras.layers.Activation(tf.keras.activations.softmax,
                                              name='sigmoid'))
     return model
 
@@ -54,7 +57,17 @@ def train(argv=None):
                                                   buffer_size=10000,
                                                   seed=0,
                                                   scale=True,
-                                                  include_vald=True)
+                                                  include_vald=True,
+                                                  flip_indices=FLAGS.flip_indices)
+
+    if FLAGS.evaluate:
+        print('Evaluating model with flip indices set to {}'.format(FLAGS.flip_indices))
+        model = tf.keras.models.load_model('model.h5')
+        print('---------- Train Set ----------')
+        model.evaluate(train_set, verbose=2)
+        print('---------- Vald Set ----------')
+        model.evaluate(vald_set,  verbose=2)
+        return
 
     model = build_model(weight_decay=FLAGS.weight_decay,
                         num_layers=FLAGS.num_layers,

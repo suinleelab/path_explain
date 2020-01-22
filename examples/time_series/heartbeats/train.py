@@ -10,6 +10,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from sklearn.utils import shuffle
 from scipy.signal import resample
 from sklearn.preprocessing import OneHotEncoder
+from path_explain.utils import set_up_environment
 
 from model import cnn_model
 from preprocess import mitbih_dataset
@@ -22,9 +23,10 @@ flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate to use for tra
 flags.DEFINE_float('beta_1', 0.9, 'Parameters for adam')
 flags.DEFINE_float('beta_2', 0.999, 'Parameters for adam')
 flags.DEFINE_float('decay_rate', 0.95, 'Exponential learning rate decay parameter')
-
+flags.DEFINE_string('visible_devices', '0', 'Which gpu to train on')
 flags.DEFINE_integer('batch_size', 500, 'Batch size for training')
 flags.DEFINE_integer('epochs', 75, 'Number of epochs to train for')
+flags.DEFINE_boolean('evaluate', False, 'Set to true to evaluate a saved model')
 
 def exp_decay(epoch):
     initial_lrate = 0.001
@@ -34,9 +36,20 @@ def exp_decay(epoch):
     return lrate
 
 def train(argv=None):
+    set_up_environment(visible_devices=FLAGS.visible_devices)
+
     print('Reading data...')
     x_train, y_train, x_test, y_test = mitbih_dataset()
     print('Dataset shape: {}'.format(x_train.shape))
+
+    if FLAGS.evaluate:
+        model = tf.keras.models.load_model('model.h5')
+        print('Evaluating on the training data...')
+        model.evaluate(x_train, y_train, verbose=2)
+        print('Evaluating on the test data...')
+        model.evaluate(x_test, y_test, verbose=2)
+        return
+
     print('Building model...')
     model = cnn_model()
 

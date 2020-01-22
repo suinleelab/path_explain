@@ -17,6 +17,7 @@ from absl import flags
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_samples', 300, 'Number of samples to draw for attributions')
 flags.DEFINE_integer('num_sentences', 100, 'Number of sentences to interpret')
+flags.DEFINE_integer('use_custom_sentences', False, 'Set to true to interpret custom sentences')
 
 def interpret(argv=None):
     print('Setting up environment...')
@@ -44,6 +45,11 @@ def interpret(argv=None):
 
     explainer = PathExplainerTF(interpret_model)
 
+
+    if use_custom_sentences:
+        custom_sentences = ['This movie was good',
+                            'This movie was not good']
+
     num_accumulated = 0
     accumulated_inputs = []
     accumulated_embeddings = []
@@ -51,7 +57,7 @@ def interpret(argv=None):
         batch_embedding = embedding_model(batch_input)
 
         batch_pred = model(batch_input)
-        batch_pred_max = np.argmax(batch_pred, axis=-1)
+        batch_pred_max = (batch_pred[:, 0].numpy() > 0.5).astype(int)
 
         correct_mask = batch_pred_max == batch_label
 
@@ -82,7 +88,7 @@ def interpret(argv=None):
 
     print('Getting interactions...')
     # Get pairwise word interactions
-    max_indices = np.sum(accumulated_inputs[-1] != 0)
+    max_indices = np.max(np.sum(accumulated_inputs != 0, axis=-1))
     interaction_matrix = np.zeros((accumulated_embeddings.shape[0],
                                    max_indices,
                                    FLAGS.embedding_dim,

@@ -33,3 +33,8 @@ def set_up_environment(mem_frac=None, visible_devices=None, min_log_level='3'):
                     tf.config.experimental.set_memory_growth(gpu, True)
         except RuntimeError as error:
             print(error)
+
+def softplus_activation(beta):
+    def softplus(x):
+        return (1.0 / beta) * tf.keras.backend.log(1.0 + tf.keras.backend.exp(beta * x))
+    return softplus
