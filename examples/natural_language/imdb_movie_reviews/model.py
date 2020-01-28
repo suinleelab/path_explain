@@ -1,4 +1,5 @@
 import tensorflow as tf
+from path_explain.utils import softplus_activation
 
 def lstm_model(vocab_length,
                embedding_dim=32,
@@ -10,7 +11,7 @@ def lstm_model(vocab_length,
     input_shape = (sequence_length,)
     activation_function = tf.keras.activations.relu
     if for_interpretation:
-        activation_function = tf.keras.activations.softplus
+        activation_function = softplus_activation(beta=10.0)
 
     model = tf.keras.models.Sequential()
 
@@ -53,7 +54,7 @@ def cnn_model(vocab_length,
     input_shape = (sequence_length,)
     activation_function = tf.keras.activations.relu
     if for_interpretation:
-        activation_function = tf.keras.activations.softplus
+        activation_function = softplus_activation(beta=10.0)
 
     if not for_interpretation:
         model_input = tf.keras.layers.Input(shape=input_shape,
