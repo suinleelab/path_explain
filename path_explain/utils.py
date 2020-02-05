@@ -91,6 +91,9 @@ def fold_array(array, join_ranges):
     return array
 
 def fold_matrix(array, join_ranges):
+    """
+    A helper function to fold a number matrix along certain ranges.
+    """
     array = array.copy()
     delete_slices = []
     for join_range in join_ranges:
@@ -105,6 +108,9 @@ def fold_matrix(array, join_ranges):
     return array
 
 def fold_tokens(array, join_ranges, join_string='##'):
+    """
+    A helper function to fold a list of strings along certain ranges.
+    """
     delete_slices = []
     for join_range in join_ranges:
         replace_string = ''.join(list(array[join_range[0]:join_range[1]])).replace(join_string, '')
@@ -129,7 +135,8 @@ def strip_tokens(tokens,
     Args:
         tokens: a numpy matrix of words, shaped [batch_size, sequence_length]
         attributions: a numpy matrix of floats, shaped [batch_size, sequence_length]
-        interactions: a numpy matrix of floats, shaped [batch_size, sequence_length, sequence_length]
+        interactions: a numpy matrix of floats, shaped [batch_size,
+                      sequence_length, sequence_length]
     """
     token_list = []
     attribution_list = []

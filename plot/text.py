@@ -73,13 +73,13 @@ def text_plot(word_array,
         fontweight = 500
         fontsize = 16
         y_pos = 0.5
-        zorder=0
+        zorder = 0
         if interaction_index is not None:
             y_pos = 0.7
             if i == interaction_index:
                 fontweight = 700
                 fontsize = 22
-                zorder=10
+                zorder = 10
 
         color = color_mapper.to_rgba(importance)
         text = plt.text(x=0.0,
@@ -122,8 +122,8 @@ def text_plot(word_array,
 
 def matrix_interaction_plot(interaction_matrix,
                             tokens,
-                            ax=None,
-                            cbar_kw={},
+                            axis=None,
+                            cbar_kw=None,
                             cbarlabel="Interaction Value",
                             zero_diagonals=True,
                             **kwargs):
@@ -133,51 +133,54 @@ def matrix_interaction_plot(interaction_matrix,
     Args:
         interaction_matrix: A len(tokens), len(tokens) sized matrix.
         tokens: A list of strings
-        ax: An existing matplotlib axis object
+        axis: An existing matplotlib axis object
         cbar_kw: Color bar kwargs
         cbarlabel: Label for the color bar
         zero_diagonals: Set to False to show self interactions. Defaults to True.
         kwargs: plt.imshow kwargs
     """
+    if cbar_kw is None:
+        cbar_kw = {}
+
     if zero_diagonals:
         interaction_matrix = interaction_matrix.copy()
         np.fill_diagonal(interaction_matrix, 0.0)
 
-    if not ax:
-        ax = plt.gca()
+    if not axis:
+        axis = plt.gca()
 
     bounds = np.max(np.abs(interaction_matrix))
 
     # Plot the heatmap
     if 'cmap' not in kwargs:
         kwargs['cmap'] = colors.maroon_white_aqua()
-    im = ax.imshow(interaction_matrix, vmin=-bounds, vmax=bounds, **kwargs)
+    image = axis.imshow(interaction_matrix, vmin=-bounds, vmax=bounds, **kwargs)
 
     # Create colorbar
-    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
-    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom", fontsize=14)
-    cbar.ax.tick_params(length=6, labelsize=12)
+    cbar = axis.figure.colorbar(image, ax=axis, **cbar_kw)
+    cbar.axis.set_ylabel(cbarlabel, rotation=-90, va="bottom", fontsize=14)
+    cbar.axis.tick_params(length=6, labelsize=12)
     cbar.outline.set_visible(False)
 
     # We want to show all ticks...
-    ax.set_xticks(np.arange(interaction_matrix.shape[1]))
-    ax.set_yticks(np.arange(interaction_matrix.shape[0]))
+    axis.set_xticks(np.arange(interaction_matrix.shape[1]))
+    axis.set_yticks(np.arange(interaction_matrix.shape[0]))
     # ... and label them with the respective list entries.
-    ax.set_xticklabels(tokens)
-    ax.set_yticklabels(tokens)
-    ax.tick_params(length=6, labelsize=14)
+    axis.set_xticklabels(tokens)
+    axis.set_yticklabels(tokens)
+    axis.tick_params(length=6, labelsize=14)
 
     # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+    plt.setp(axis.get_xticklabels(), rotation=45, ha="right",
              rotation_mode="anchor")
 
     # Turn spines off and create white grid.
-    for edge, spine in ax.spines.items():
+    for _, spine in axis.spines.items():
         spine.set_visible(False)
 
-    ax.set_xticks(np.arange(interaction_matrix.shape[1]+1)-.5, minor=True)
-    ax.set_yticks(np.arange(interaction_matrix.shape[0]+1)-.5, minor=True)
-    ax.tick_params(which="minor", bottom=False, left=False)
+    axis.set_xticks(np.arange(interaction_matrix.shape[1]+1)-.5, minor=True)
+    axis.set_yticks(np.arange(interaction_matrix.shape[0]+1)-.5, minor=True)
+    axis.tick_params(which="minor", bottom=False, left=False)
 
     color_threshold = np.quantile(interaction_matrix, 0.25)
     for i in range(interaction_matrix.shape[0]):
@@ -195,16 +198,20 @@ def matrix_interaction_plot(interaction_matrix,
                 text = '{},\n{}'.format(tokens[i], tokens[j])
 
 
-            text = ax.text(j, i, text,
-                           ha='center', va='center', color=color,
-                           fontsize=12)
+            text = axis.text(j,
+                             i,
+                             text,
+                             ha='center',
+                             va='center',
+                             color=color,
+                             fontsize=12)
 
-    return im, cbar
+    return image, cbar
 
 def bar_interaction_plot(interaction_matrix,
                          tokens,
                          top_k=5,
-                         text_kwargs={},
+                         text_kwargs=None,
                          pair_indices=None,
                          zero_diagonals=True,
                          **kwargs):
@@ -226,12 +233,15 @@ def bar_interaction_plot(interaction_matrix,
         zero_diagonals: Set to False to show self-interactions. Defaults to True.
         **kwargs: Passed to plt.barh()
     """
+    if text_kwargs is None:
+        text_kwargs = {}
+
     if zero_diagonals:
         interaction_matrix = interaction_matrix.copy()
         np.fill_diagonal(interaction_matrix, 0.0)
 
     if pair_indices is None:
-        pair_indices = np.argsort(np.triu(np.abs(interaction_matrix)).flatten())[::-1][:top_k]
+        pair_indices = np.argsort(np.flatten(np.triu(np.abs(interaction_matrix))))[::-1][:top_k]
         pair_indices = np.vstack(np.unravel_index(pair_indices, interaction_matrix.shape)).T
     else:
         top_k = len(pair_indices)
@@ -239,10 +249,13 @@ def bar_interaction_plot(interaction_matrix,
     token_labels = []
     interaction_values = []
     for index in pair_indices[::-1]:
-        token_labels.append('{}, {} ({}, {})'.format(tokens[index[0]], tokens[index[1]], index[0], index[1]))
+        token_labels.append('{}, {} ({}, {})'.format(tokens[index[0]],
+                                                     tokens[index[1]],
+                                                     index[0],
+                                                     index[1]))
         interaction_values.append(interaction_matrix[index[0], index[1]])
 
-    fig, ax = plt.subplots()
+    fig, axis = plt.subplots()
 
     bounds = np.max(np.abs(interaction_matrix))
     normalizer = mpl.colors.Normalize(vmin=-bounds, vmax=bounds)
@@ -252,21 +265,21 @@ def bar_interaction_plot(interaction_matrix,
     else:
         cmap = colors.maroon_white_aqua()
 
-    ax.barh(np.arange(top_k),
-            interaction_values,
-            color=[cmap(normalizer(c)) for c in interaction_values],
-            align='center',
-            zorder=10,
-            **kwargs)
-    ax.set_xlabel('Interaction Value', fontsize=14)
-    ax.set_ylabel('Strongest Interacting Pairs', fontsize=14)
-    ax.set_yticks(np.arange(top_k))
-    ax.tick_params(axis='y', which='both', left=False, labelsize=12)
-    ax.set_yticklabels(token_labels)
+    axis.barh(np.arange(top_k),
+              interaction_values,
+              color=[cmap(normalizer(c)) for c in interaction_values],
+              align='center',
+              zorder=10,
+              **kwargs)
+    axis.set_xlabel('Interaction Value', fontsize=14)
+    axis.set_ylabel('Strongest Interacting Pairs', fontsize=14)
+    axis.set_yticks(np.arange(top_k))
+    axis.tick_params(axis='y', which='both', left=False, labelsize=12)
+    axis.set_yticklabels(token_labels)
 
-    ax.grid(axis='x', zorder=0, linewidth=0.2)
-    ax.grid(axis='y', zorder=0, linestyle='--', linewidth=1.0)
-    _set_axis_config(ax,
+    axis.grid(axis='x', zorder=0, linewidth=0.2)
+    axis.grid(axis='y', zorder=0, linestyle='--', linewidth=1.0)
+    _set_axis_config(axis,
                      linewidths=(0.0, 0.0, 0.0, 1.0))
 
     text_ax = fig.add_axes([0.1, 0.9, 0.8, 0.1])
@@ -281,23 +294,23 @@ def bar_interaction_plot(interaction_matrix,
 
     for i, token in enumerate(tokens):
         text = text_ax.text(x=0.0,
-                       y=0.6,
-                       s=token,
-                       transform=axis_transform,
-                       fontsize=16,
-                       **text_kwargs)
+                            y=0.6,
+                            s=token,
+                            transform=axis_transform,
+                            fontsize=16,
+                            **text_kwargs)
         index_spacing = 0.0
         if len(token) > 2:
             index_spacing = len(token) * 0.01
         text_ax.text(x=index_spacing,
-                y=0.0,
-                s=str(i),
-                transform=axis_transform,
-                fontsize=16,
-                **text_kwargs)
+                     y=0.0,
+                     s=str(i),
+                     transform=axis_transform,
+                     fontsize=16,
+                     **text_kwargs)
         text.draw(fig.canvas.get_renderer())
         ex = text.get_window_extent()
         axis_transform = mpl.transforms.offset_copy(text._transform,
                                                     x=ex.width + space_bounds.width,
                                                     units='dots')
-    return ax, text_ax
+    return axis, text_ax

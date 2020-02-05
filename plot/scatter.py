@@ -134,7 +134,8 @@ def scatter_plot(attributions,
             main_name:  attributions[:, feature_index] - interaction_column
         })
         if add_random_noise_x:
-            inter_df[x_name] += np.random.randn(feature_values.shape[0]) * np.std(inter_df[x_name]) * 0.05
+            inter_df[x_name] += np.random.randn(feature_values.shape[0]) * \
+                                np.std(inter_df[x_name]) * 0.05
 
     if add_random_noise_x:
         data_df[x_name] += np.random.randn(feature_values.shape[0]) * np.std(data_df[x_name]) * 0.05
