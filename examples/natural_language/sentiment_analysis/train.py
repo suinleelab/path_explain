@@ -18,6 +18,7 @@ flags.DEFINE_integer('embedding_dim', 32, 'Size of the embedding')
 flags.DEFINE_float('dropout_rate', 0.5, 'Fraction of inputs to set to 0 during training')
 flags.DEFINE_float('learning_rate', 0.001, 'Learning rate to use while training')
 flags.DEFINE_string('visible_devices', '0', 'CUDA_VISIBLE_DEVICES flag')
+flags.DEFINE_boolean('eval_only', False, 'Set to true to evaluate a stored model')
 
 def train(argv=None):
     set_up_environment(visible_devices=FLAGS.visible_devices)
@@ -26,6 +27,15 @@ def train(argv=None):
     train_set, vald_set = sentiment_dataset(batch_size=FLAGS.batch_size,
                                             max_sequence_length=FLAGS.sequence_length)
     encoder = tfds.features.text.TokenTextEncoder.load_from_file('encoder')
+
+
+    if FLAGS.eval_only:
+        model = tf.keras.models.load_model('model.h5')
+        print('Evaluating on the training set...')
+        model.evaluate(train_set, verbose=1)
+        print('Evaluating on the validation set...')
+        model.evaluate(vald_set, verbose=1)
+        return
 
     print('Building model...')
     model = cnn_model(encoder.vocab_size,

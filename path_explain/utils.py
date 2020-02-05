@@ -56,8 +56,8 @@ def _find_sublist(super_list, sub_list):
     """
     indices = []
     for i in range(len(super_list)):
-        if super_list[i] == sub_list[0] and super_list[i:i+len(sub_list)] == sub_list:
-            indices.append([i + j - 1 for j in range(len(sub_list) + 1)])
+        if super_list[i:i+len(sub_list)] == sub_list:
+            indices.append([i + j for j in range(len(sub_list))])
     return indices
 
 def _find_step_increasing(index_list):

@@ -52,8 +52,11 @@ def scatter_plot(attributions,
                  feature_names=None,
                  scale_x_ind=False,
                  scale_y_ind=False,
+                 plot_main=True,
                  figsize=5,
                  dpi=150,
+                 add_random_noise_x=False,
+                 add_random_noise_y=False,
                  **kwargs):
     """
     Function to draw a scatter plot of
@@ -81,8 +84,13 @@ def scatter_plot(attributions,
                      Defaults to False.
         scale_y_ind: Set to True to scale the y axes of each plot independently.
                      Defaults to False.
+        plot_main: Set to False to not plot the main effect.
         figsize: Figure size in matplotlib units. Each figure will be square.
         dpi: Resolution of each plot.
+        add_random_noise_x: Set to true to add some jitter in the x axis, e.g. for
+                            categorically encoded variables.
+        add_random_noise_y: Set to true to add some jitter in the y axis, e.g. for
+                            categorically encoded variables.
         kwargs: passed to matplotlib.pyplot.scatter
     """
     feature_index, color_by, feature_names = _clean_input(feature_index,
@@ -125,9 +133,19 @@ def scatter_plot(attributions,
             inter_name: interaction_column,
             main_name:  attributions[:, feature_index] - interaction_column
         })
+        if add_random_noise_x:
+            inter_df[x_name] += np.random.randn(feature_values.shape[0]) * np.std(inter_df[x_name]) * 0.05
+
+    if add_random_noise_x:
+        data_df[x_name] += np.random.randn(feature_values.shape[0]) * np.std(data_df[x_name]) * 0.05
+    if add_random_noise_y:
+        data_df[y_name] += np.random.randn(feature_values.shape[0]) * np.std(data_df[y_name]) * 0.05
 
     if color_by is not None:
-        fig, axs = plt.subplots(1, 3, figsize=(3 * figsize + 1, figsize), dpi=dpi)
+        if plot_main:
+            fig, axs = plt.subplots(1, 3, figsize=(3 * figsize + 1, figsize), dpi=dpi)
+        else:
+            fig, axs = plt.subplots(1, 2, figsize=(2 * figsize + 1, figsize), dpi=dpi)
     else:
         fig, axis = plt.subplots(1, 1, figsize=(figsize, figsize), dpi=dpi)
         axs = [axis]
@@ -139,8 +157,9 @@ def scatter_plot(attributions,
     if color_by is not None:
         _single_scatter(axs[1], inter_df, x_name, inter_name,
                         color_name, x_limits, y_limits, **kwargs)
-        _single_scatter(axs[2], inter_df, x_name, main_name,
-                        color_name, x_limits, y_limits, **kwargs)
+        if plot_main:
+            _single_scatter(axs[2], inter_df, x_name, main_name,
+                            color_name, x_limits, y_limits, **kwargs)
         _color_bar(fig, vmin, vmax, color_name, **kwargs)
         fig.subplots_adjust(wspace=0.27)
 

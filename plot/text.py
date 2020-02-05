@@ -15,6 +15,7 @@ def text_plot(word_array,
               vmax=None,
               interaction_matrix=None,
               interaction_index=None,
+              zero_diagonals=True,
               **kwargs):
     """
     A function to plot attributions on text data.
@@ -25,8 +26,14 @@ def text_plot(word_array,
         include_legend: If true, plots a color bar legend.
         interaction_matrix: Matrix of interactions, if you want additional explanations.
         interaction_index: Index to explain. Defaults to None.
+        zero_diagonals: Set to true if you want to not show the diagonals (self-interactions)
+                        while plotting
         **kwargs: Sent to matplotlib.pyplot.text
     """
+    if zero_diagonals and interaction_matrix is not None:
+        interaction_matrix = interaction_matrix.copy()
+        np.fill_diagonal(interaction_matrix, 0.0)
+
     figsize = (0.1, 0.1)
     if include_legend:
         figsize = (10, 2)
@@ -36,10 +43,8 @@ def text_plot(word_array,
     plt.axis('off')
     axis_transform = axis.transData
 
-    if interaction_index is not None:
-        spacing = '     '
-    else:
-        spacing = '   '
+
+    spacing = '     '
     space_text = plt.text(x=0.0,
                           y=1.0,
                           s=spacing,
@@ -61,7 +66,7 @@ def text_plot(word_array,
                                       vmax=vmax)
 
     color_mapper = mpl.cm.ScalarMappable(norm=normalizer,
-                                         cmap=colors.green_white_gold())
+                                         cmap=colors.maroon_white_aqua())
 
 
     for i, (word, importance) in enumerate(zip(word_array, attributions)):
@@ -120,6 +125,7 @@ def matrix_interaction_plot(interaction_matrix,
                             ax=None,
                             cbar_kw={},
                             cbarlabel="Interaction Value",
+                            zero_diagonals=True,
                             **kwargs):
     """
     A function to plot the text interaction matrix.
@@ -130,8 +136,13 @@ def matrix_interaction_plot(interaction_matrix,
         ax: An existing matplotlib axis object
         cbar_kw: Color bar kwargs
         cbarlabel: Label for the color bar
+        zero_diagonals: Set to False to show self interactions. Defaults to True.
         kwargs: plt.imshow kwargs
     """
+    if zero_diagonals:
+        interaction_matrix = interaction_matrix.copy()
+        np.fill_diagonal(interaction_matrix, 0.0)
+
     if not ax:
         ax = plt.gca()
 
@@ -139,7 +150,7 @@ def matrix_interaction_plot(interaction_matrix,
 
     # Plot the heatmap
     if 'cmap' not in kwargs:
-        kwargs['cmap'] = colors.green_white_gold()
+        kwargs['cmap'] = colors.maroon_white_aqua()
     im = ax.imshow(interaction_matrix, vmin=-bounds, vmax=bounds, **kwargs)
 
     # Create colorbar
@@ -195,6 +206,7 @@ def bar_interaction_plot(interaction_matrix,
                          top_k=5,
                          text_kwargs={},
                          pair_indices=None,
+                         zero_diagonals=True,
                          **kwargs):
     """
     A function to plot the word pairs with the largest
@@ -211,8 +223,13 @@ def bar_interaction_plot(interaction_matrix,
                       That is, pair_indices[i] is
                       the ith index into the matrix interaction_matrix
                       that you want plotted.
+        zero_diagonals: Set to False to show self-interactions. Defaults to True.
         **kwargs: Passed to plt.barh()
     """
+    if zero_diagonals:
+        interaction_matrix = interaction_matrix.copy()
+        np.fill_diagonal(interaction_matrix, 0.0)
+
     if pair_indices is None:
         pair_indices = np.argsort(np.triu(np.abs(interaction_matrix)).flatten())[::-1][:top_k]
         pair_indices = np.vstack(np.unravel_index(pair_indices, interaction_matrix.shape)).T
@@ -233,7 +250,7 @@ def bar_interaction_plot(interaction_matrix,
     if 'cmap' in kwargs:
         cmap = kwargs['cmap']
     else:
-        cmap = colors.green_white_gold()
+        cmap = colors.maroon_white_aqua()
 
     ax.barh(np.arange(top_k),
             interaction_values,
@@ -269,7 +286,10 @@ def bar_interaction_plot(interaction_matrix,
                        transform=axis_transform,
                        fontsize=16,
                        **text_kwargs)
-        text_ax.text(x=0.0,
+        index_spacing = 0.0
+        if len(token) > 2:
+            index_spacing = len(token) * 0.01
+        text_ax.text(x=index_spacing,
                 y=0.0,
                 s=str(i),
                 transform=axis_transform,

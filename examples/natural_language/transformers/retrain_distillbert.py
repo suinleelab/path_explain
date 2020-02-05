@@ -61,6 +61,8 @@ def train(argv=None):
 
     num_labels = len(glue_processors[FLAGS.task]().get_labels())
     tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+    config = DistilBertConfig.from_pretrained('distilbert-base-uncased', num_labels=num_labels)
+    model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', config=config)
 
     # Load dataset via TensorFlow Datasets
     data, info = tensorflow_datasets.load(f'glue/{_get_tfds_task(FLAGS.task)}', with_info=True)
@@ -82,29 +84,6 @@ def train(argv=None):
                                                       FLAGS.task)
     train_dataset = train_dataset.shuffle(FLAGS.buffer_size).batch(FLAGS.batch_size).repeat(-1)
     valid_dataset = valid_dataset.batch(FLAGS.batch_size * 2)
-
-    large_config = DistilBertConfig.from_pretrained('distilbert-base-uncased', num_labels=num_labels)
-    large_model = TFDistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', config=large_config)
-
-    config = DistilBertConfig.from_pretrained('distilbert-base-uncased', num_labels=num_labels, dim=144)
-    model = TFDistilBertForSequenceClassification(config=config)
-    _ = model.predict(valid_dataset)
-
-    weight_list = []
-
-    for i in range(len(large_model.layers[0].weights)):
-        large_weight = large_model.layers[0].weights[i]
-        slice_indices = []
-        for s in large_weight.get_shape().as_list():
-            if s == 768:
-                slice_indices.append(slice(0, 144))
-            else:
-                slice_indices.append(slice(None))
-        slice_indices = tuple(slice_indices)
-        sliced_large_weight = large_weight[slice_indices]
-        weight_list.append(sliced_large_weight)
-
-    model.layers[0].set_weights(weight_list)
 
     # Prepare training: Compile tf.keras model with optimizer, loss and learning rate schedule
     opt = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate, epsilon=FLAGS.epsilon)

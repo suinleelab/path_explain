@@ -18,7 +18,7 @@ def green_gold():
     cmap = mpl.colors.ListedColormap(vals)
     return cmap
 
-def green_white_gold():
+def maroon_white_aqua():
     """
     Returns the green and gold colormap we use as the
     default color scheme for plotting text.
