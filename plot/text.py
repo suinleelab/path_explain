@@ -158,8 +158,8 @@ def matrix_interaction_plot(interaction_matrix,
 
     # Create colorbar
     cbar = axis.figure.colorbar(image, ax=axis, **cbar_kw)
-    cbar.axis.set_ylabel(cbarlabel, rotation=-90, va="bottom", fontsize=14)
-    cbar.axis.tick_params(length=6, labelsize=12)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom", fontsize=14)
+    cbar.ax.tick_params(length=6, labelsize=12)
     cbar.outline.set_visible(False)
 
     # We want to show all ticks...
