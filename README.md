@@ -1,3 +1,3 @@
-# Interaction Effects
+# Path Explain
 
-A repository for exploring Shapley interaction and main effects, and what they can reveal about why our models use the features they do.
+A repository for explaining feature importances and feature interactions in deep neural networks using path attribution methods.
