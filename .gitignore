@@ -1,3 +1,5 @@
+*.model
+*.h5
 *.pdf
 *.pickle
 *.json
