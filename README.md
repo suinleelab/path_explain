@@ -17,6 +17,9 @@ Alternatively, you can clone this repository to re-run and explore the examples 
 ## Comptability
 This package was written to support TensorFlow 2.0 (in eager execution mode) with Python 3. We have no current plans to support earlier versions of TensorFlow or Python. 
 
+## API
+Although we don't yet have formal API documentation, the underlying code does a pretty good job at explaining the API. See the code for generating [attributions](https://github.com/suinleelab/path_explain/blob/master/path_explain/explainers/path_explainer_tf.py#L302) and [interactions](https://github.com/suinleelab/path_explain/blob/master/path_explain/explainers/path_explainer_tf.py#L445) to better understand what the arguments to these functions mean. 
+
 ## Examples
 
 For a simple, quick example to get started using this repository, see the `example_usage.ipynb` notebook in the top-level directory of this repository. It gives an overview of the functionality provided by this repository. For more advanced examples, keep reading on. 
