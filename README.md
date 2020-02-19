@@ -25,7 +25,7 @@ pip install path-explain
 ```
 Alternatively, you can clone this repository to re-run and explore the examples provided.
 
-## Comptability
+## Compatability
 This package was written to support TensorFlow 2.0 (in eager execution mode) with Python 3. We have no current plans to support earlier versions of TensorFlow or Python. 
 
 ## API
