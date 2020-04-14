@@ -39,7 +39,7 @@ class SamplingExplainerTF():
         if output_index is not None:
             outputs = outputs[: output_index]
         elif len(outputs.shape) > 1:
-             outputs = np.sum(outputs.reshape(-1, outputs.shape[0]), axis=-1)s
+             outputs = np.sum(outputs.reshape(-1, outputs.shape[0]), axis=-1)
         return outputs
 
     def _sampling_estimate(self,
@@ -99,7 +99,7 @@ class SamplingExplainerTF():
     def _batch_attributions(self,
                             batch_inputs,
                             batch_baselines,
-                            number_of_samples=None
+                            number_of_samples=None,
                             output_index=None):
         num_features = batch_inputs.shape[1]
         batch_attributions = np.zeros(batch_inputs.shape)
@@ -239,7 +239,59 @@ class SamplingExplainerTF():
 
             batch_attributions = self._batch_attributions(batch_inputs,
                                                           batch_baselines,
-                                                          number_of_samples=number_of_samples
+                                                          number_of_samples=number_of_samples,
                                                           output_index=output_index)
             attributions[i:i + effective_batch_size] = batch_attributions
         return attributions
+
+
+    def interactions(self,
+                     inputs,
+                     baselines,
+                     batch_size=50,
+                     number_of_samples=None,
+                     output_index=None,
+                     verbose=False):
+        """
+        A function to compute interactions directly using the shapley interaction index.
+        This function can either churn through an exponential number of computations,
+        or sample uniformly from the subsets to get approximate attributions.
+
+        Args:
+            inputs: A tensor of inputs to the model of shape (batch_size, ...).
+            baselines: A tensor of inputs to the model, either of shape (k, ...)
+                       or of shape (...). In the latter case, uses the same baseline for all inputs.
+                       In the former case, we assume k == batch_size and each baseline is fixed to the batch.
+            batch_size: The maximum number of inputs to input into the model
+                        simultaneously.
+            number_of_samples: The number of samples to approximate the shapley value
+                               with. If this parameter is None, it computes them exactly.
+            output_index: Set to an integer to index into the output. Otherwise sums the outputs.
+            verbose: Set to true to print a progress bar during computation.
+        """
+        num_inputs   = inputs.shape[0]
+        num_features = inputs.shape[1]
+
+        interactions = np.zeros(num_inputs, num_features, num_features)
+
+        iterable = range(0, num_inputs, batch_size)
+        if verbose:
+            iterable = tqdm(iterable)
+
+        for i in iterable:
+            effective_batch_size = min(batch_size, num_inputs - i)
+            batch_inputs = inputs[i:i + effective_batch_size]
+
+            if len(baselines.shape) == len(inputs.shape[0]):
+                batch_baselines = baselines.copy()
+                batch_baselines = batch_baselines[np.newaxis, :]
+                batch_baselines = np.tile(batch_baselines, reps=(effective_batch_size, 1))
+            else:
+                batch_baselines = baselines[i:i + effective_batch_size]
+
+            batch_interactions = self._batch_interactions(batch_inputs,
+                                                          batch_baselines,
+                                                          number_of_samples=number_of_samples,
+                                                          output_index=output_index)
+            interactions[i:i + effective_batch_size] = batch_interactions
+        return interactions
