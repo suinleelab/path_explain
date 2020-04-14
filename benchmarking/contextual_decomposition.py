@@ -34,15 +34,18 @@ class ContextualDecompositionExplainerTF():
         for layer in self.model.layers:
             if isinstance(layer, tf.keras.layers.Dense):
                 layer_weight = layer.weights[0]
-                layer_bias   = layer.weights[1]
+
+                if len(layer.weights) > 1:
+                    layer_bias   = layer.weights[1]
+                else:
+                    layer_bias = tf.zeros(layer_weight.shape[1])
 
                 weight_beta  = tf.matmul(batch_beta, layer_weight)
                 weight_gamma = tf.matmul(batch_gamma, layer_weight)
 
                 # We add a small constant to the divisor to avoid zero-division
                 # Note that arithmetic operations are performed on GPU
-
-                bias_weight_sum   = tf.abs(weight_beta)  + tf.abs(weight_gamma) + 1e-20
+                bias_weight_sum   = tf.abs(weight_beta) + tf.abs(weight_gamma) + 1e-20
                 bias_weight_beta  = tf.abs(weight_beta)  / bias_weight_sum
                 bias_weight_gamma = tf.abs(weight_gamma) / bias_weight_sum
 
@@ -51,6 +54,14 @@ class ContextualDecompositionExplainerTF():
 
                 batch_beta  = weight_beta  + bias_beta
                 batch_gamma = weight_gamma + bias_gamma
+
+                if layer.activation is not None:
+                    activation_beta  = layer.activation (batch_beta)
+                    activation_gamma = layer.activation (batch_beta + batch_gamma) - \
+                                       layer.activation (batch_beta)
+
+                    batch_beta  = activation_beta
+                    batch_gamma = activation_gamma
             elif isinstance(layer, tf.keras.layers.Activation):
                 # Here we handle propagation through (ReLU) activations.
                 activation_beta  = layer(batch_beta)
@@ -128,12 +139,14 @@ class ContextualDecompositionExplainerTF():
 
             if isinstance(output_indices, int):
                 batch_output_indices = [output_indices] * number_to_draw
-            elif batch_output_indices is not None:
+            elif output_indices is not None:
                 batch_output_indices = output_indices[i:(i + number_to_draw)]
+            else:
+                batch_output_indices = None
 
             batch_beta, batch_gamma = self._cd_scores(batch_inputs,
-                                                 batch_masks,
-                                                 batch_output_indices)
+                                                      batch_masks,
+                                                      batch_output_indices)
             betas.append(batch_beta)
             gammas.append(batch_gamma)
 

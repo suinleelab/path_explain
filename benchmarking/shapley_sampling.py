@@ -37,9 +37,9 @@ class SamplingExplainerTF():
         outputs = self.model(inputs)
 
         if output_index is not None:
-            outputs = outputs[: output_index]
+            outputs = outputs[:, output_index]
         elif len(outputs.shape) > 1:
-             outputs = np.sum(outputs.reshape(-1, outputs.shape[0]), axis=-1)
+             outputs = np.sum(outputs, axis=-1)
         return outputs
 
     def _sampling_estimate(self,
@@ -48,8 +48,7 @@ class SamplingExplainerTF():
                            feature_index,
                            number_of_samples,
                            output_index=None,
-                           interaction=False,
-                           ):
+                           interaction=False):
         accumulated_differences = []
         num_features = batch_inputs.shape[1]
 
@@ -112,7 +111,7 @@ class SamplingExplainerTF():
                 batch_with_S[:, S] = batch_inputs[:, S]
                 v_S = self._call_model(batch_with_S, output_index)
 
-                for feature in filter(lambda x: x not in feature_powerset,
+                for feature in filter(lambda x: x not in S,
                                       range(num_features)):
                     # Then we create the subset S u {i}
                     batch_with_S[:, feature] = batch_inputs[:, feature]
@@ -126,7 +125,7 @@ class SamplingExplainerTF():
 
                     # And weight them appropriately
                     batch_attributions[:, feature] += difference * \
-                        SamplingExplainerTF.weight_coff(len(S), num_features)
+                        SamplingExplainerTF.weight_coeff(len(S), num_features)
         else:
             for feature_index in range(num_features):
                 batch_importance = self._sampling_estimate(batch_inputs,
@@ -141,10 +140,11 @@ class SamplingExplainerTF():
     def _batch_interactions(self,
                             batch_inputs,
                             batch_baselines,
-                            number_of_samples=None):
+                            number_of_samples=None,
+                            output_index=None):
         num_samples = batch_inputs.shape[0]
         num_features = batch_inputs.shape[1]
-        batch_interactions = np.zeros(num_samples, num_features, num_features)
+        batch_interactions = np.zeros((num_samples, num_features, num_features))
 
         if number_of_samples is None:
             feature_powerset = SamplingExplainerTF.powerset(range(num_features))
@@ -154,9 +154,9 @@ class SamplingExplainerTF():
                 batch_with_S[:, S] = batch_inputs[:, S]
                 v_S = self._call_model(batch_with_S, output_index)
 
-                for i in filter(lambda x: x not in feature_powerset,
+                for i in filter(lambda x: x not in S,
                                 range(num_features)):
-                    for j in filter(lambda x: x not in feature_powerset,
+                    for j in filter(lambda x: x not in S,
                                     range(i + 1, num_features)):
                         # Then we create the subset S u {i}
                         batch_with_S[:, i] = batch_inputs[:, i]
@@ -177,7 +177,7 @@ class SamplingExplainerTF():
 
                         # And weight them appropriately
                         batch_interactions[:, i, j] += discrete_derivative * \
-                            SamplingExplainerTF.weight_coff(len(S),
+                            SamplingExplainerTF.weight_coeff(len(S),
                                                             num_features,
                                                             interaction=True)
                         batch_interactions[:, j, i] = batch_interactions[:, i, j]
@@ -220,7 +220,7 @@ class SamplingExplainerTF():
         num_inputs   = inputs.shape[0]
         num_features = inputs.shape[1]
 
-        attributions = np.zeros(num_inputs, num_features)
+        attributions = np.zeros((num_inputs, num_features))
 
         iterable = range(0, num_inputs, batch_size)
         if verbose:
@@ -230,7 +230,7 @@ class SamplingExplainerTF():
             effective_batch_size = min(batch_size, num_inputs - i)
             batch_inputs = inputs[i:i + effective_batch_size]
 
-            if len(baselines.shape) == len(inputs.shape[0]):
+            if len(baselines.shape) == len(inputs[0].shape):
                 batch_baselines = baselines.copy()
                 batch_baselines = batch_baselines[np.newaxis, :]
                 batch_baselines = np.tile(batch_baselines, reps=(effective_batch_size, 1))
@@ -243,7 +243,6 @@ class SamplingExplainerTF():
                                                           output_index=output_index)
             attributions[i:i + effective_batch_size] = batch_attributions
         return attributions
-
 
     def interactions(self,
                      inputs,
@@ -272,7 +271,7 @@ class SamplingExplainerTF():
         num_inputs   = inputs.shape[0]
         num_features = inputs.shape[1]
 
-        interactions = np.zeros(num_inputs, num_features, num_features)
+        interactions = np.zeros((num_inputs, num_features, num_features))
 
         iterable = range(0, num_inputs, batch_size)
         if verbose:
@@ -282,7 +281,7 @@ class SamplingExplainerTF():
             effective_batch_size = min(batch_size, num_inputs - i)
             batch_inputs = inputs[i:i + effective_batch_size]
 
-            if len(baselines.shape) == len(inputs.shape[0]):
+            if len(baselines.shape) == len(inputs[0].shape):
                 batch_baselines = baselines.copy()
                 batch_baselines = batch_baselines[np.newaxis, :]
                 batch_baselines = np.tile(batch_baselines, reps=(effective_batch_size, 1))
