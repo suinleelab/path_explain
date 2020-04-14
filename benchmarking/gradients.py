@@ -65,7 +65,8 @@ class GradientExplainerTF():
                      multiply_by_input=False,
                      batch_size=50,
                      output_index=None,
-                     verbose=False):
+                     verbose=False,
+                     interaction_index=None):
         """
         A function to compute interactions using the input hessian on the given input.
 
@@ -79,7 +80,10 @@ class GradientExplainerTF():
         num_samples = inputs.shape[0]
         num_features = inputs.shape[1]
 
-        interactions = np.zeros((num_samples, num_features, num_features))
+        if interaction_index is not None:
+            interactions = np.zeros((num_samples, num_features))
+        else:
+            interactions = np.zeros((num_samples, num_features, num_features))
 
         iterable = range(0, len(inputs), batch_size)
         if verbose:
@@ -102,10 +106,20 @@ class GradientExplainerTF():
                         batch_predictions = batch_predictions[:, output_index]
 
                 batch_gradients = second_tape.gradient(batch_predictions, batch_inputs)
-            batch_hessians = tape.batch_jacobian(batch_gradients, batch_inputs)
+
+                if interaction_index is not None:
+                    batch_gradients = batch_gradients[:, interaction_index]
+
+            if interaction_index is not None:
+                batch_hessians = tape.gradient(batch_gradients, batch_inputs)
+            else:
+                batch_hessians = tape.batch_jacobian(batch_gradients, batch_inputs)
 
             if multiply_by_input:
-                batch_hessians = batch_hessians * tf.expand_dims(batch_inputs, axis=2) * tf.expand_dims(batch_inputs, axis=1)
+                if interaction_index is not None:
+                    batch_hessians = batch_hessians * batch_inputs
+                else:
+                    batch_hessians = batch_hessians * tf.expand_dims(batch_inputs, axis=2) * tf.expand_dims(batch_inputs, axis=1)
 
             interactions[i:(i + number_to_draw)] = batch_hessians
         return interactions

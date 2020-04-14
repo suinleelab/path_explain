@@ -14,7 +14,7 @@ class PathExplainerTF(Explainer):
     Explains a model using path attributions from the given baseline.
     """
 
-    def __init__(self, model):
+    def __init__(self, model, pass_original_input=False):
         """
         Initialize the TF explainer class. This class
         will handle both the eager and the
@@ -23,8 +23,16 @@ class PathExplainerTF(Explainer):
         Args:
             model: A tf.keras.Model instance if executing eagerly.
                    A tuple (input_tensor, output_tensor) otherwise.
+            pass_original_input: Set to True if you want the model object
+                                 to receive the original, repeated input as well
+                                 as the interpolated input during the model call.
+                                 It will pass the input to the model as
+                                 original_input=batch_input, meaning
+                                 your mode will need to accept original_input
+                                 as an argument.
         """
         self.model = model
+        self.pass_original_input = pass_original_input
         self.eager_mode = False
         try:
             self.eager_mode = tf.executing_eagerly()
@@ -68,7 +76,12 @@ class PathExplainerTF(Explainer):
             with tf.GradientTape() as tape:
                 tape.watch(batch_interpolated)
 
-                batch_predictions = self.model(batch_interpolated)
+                if self.pass_original_input:
+                    batch_predictions = self.model(batch_interpolated,
+                                                   original_input=batch_input)
+                else:
+                    batch_predictions = self.model(batch_interpolated)
+
                 if output_index is not None:
                     batch_predictions = batch_predictions[:, output_index]
             batch_gradients = tape.gradient(batch_predictions, batch_interpolated)
@@ -93,7 +106,12 @@ class PathExplainerTF(Explainer):
             with tf.GradientTape() as first_order_tape:
                 first_order_tape.watch(batch_interpolated_alpha)
 
-                batch_predictions = self.model(batch_interpolated_alpha)
+                if self.pass_original_input:
+                    batch_predictions = self.model(batch_interpolated_alpha,
+                                                   original_input=batch_input)
+                else:
+                    batch_predictions = self.model(batch_interpolated_alpha)
+
                 if output_index is not None:
                     batch_predictions = batch_predictions[:, output_index]
 
