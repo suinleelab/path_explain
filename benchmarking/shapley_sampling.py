@@ -62,14 +62,14 @@ class SamplingExplainerTF():
                 pos = np.where(feature_indices == i)[0][0]
 
                 batch_with_S = batch_baselines.copy()
-                batch_with_S[:, feature_indices[:pos]] = batch_inputs[: feature_indices[:pos]]
+                batch_with_S[:, feature_indices[:pos]] = batch_inputs[:, feature_indices[:pos]]
                 v_S = self._call_model(batch_with_S, output_index)
 
-                batch_with_S[:, i] = batch_inputs[: i]
+                batch_with_S[:, i] = batch_inputs[:, i]
                 v_S_i = self._call_model(batch_with_S, output_index)
-                batch_with_S[:, i] = batch_baselines[: i]
+                batch_with_S[:, i] = batch_baselines[:, i]
 
-                batch_with_S[:, j] = batch_inputs[: j]
+                batch_with_S[:, j] = batch_inputs[:, j]
                 v_S_j = self._call_model(batch_with_S, output_index)
 
                 batch_with_S[:, i] = batch_inputs[:, i]
@@ -84,10 +84,11 @@ class SamplingExplainerTF():
                 pos = np.where(feature_indices == feature_index)[0][0]
 
                 batch_with_S = batch_baselines.copy()
-                batch_with_S[:, feature_indices[:pos]] = batch_inputs[: feature_indices[:pos]]
+                batch_with_S[:, feature_indices[:pos]] = batch_inputs[:, feature_indices[:pos]]
+
                 v_S = self._call_model(batch_with_S, output_index)
 
-                batch_with_S[:, feature_index] = batch_inputs[: feature_index]
+                batch_with_S[:, feature_index] = batch_inputs[:, feature_index]
                 v_S_i = self._call_model(batch_with_S, output_index)
                 difference = v_S_i - v_S
                 accumulated_differences.append(difference)
@@ -188,7 +189,8 @@ class SamplingExplainerTF():
                                                                batch_baselines,
                                                                feature_index=(i, j),
                                                                number_of_samples=number_of_samples,
-                                                               output_index=output_index)
+                                                               output_index=output_index,
+                                                               interaction=True)
                     batch_interactions[:, i, j] = batch_importance
                     batch_interactions[:, j, i] = batch_importance
         return batch_interactions
