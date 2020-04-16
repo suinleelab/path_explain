@@ -22,8 +22,7 @@ class NeuralInteractionDetectionExplainerTF():
                    first layer.
         """
         self.model = model
-        self.first_layer_weight = np.abs(self.model.layers[0].weights[0])
-        self.unit_influence = self._preprocess_weights()
+        self.unit_influence, self.first_layer_weight = self._preprocess_weights()
 
     def _preprocess_weights(self):
         """
@@ -35,6 +34,7 @@ class NeuralInteractionDetectionExplainerTF():
         for layer in self.model.layers:
             if isinstance(layer, tf.keras.layers.Dense):
                 dense_layer_weights.append(layer.weights[0])
+        first_layer_weight = np.abs(dense_layer_weights[0])
 
         aggregate_influence = tf.abs(dense_layer_weights[-1])
         dense_layer_weights = dense_layer_weights[1:-1]
@@ -42,7 +42,7 @@ class NeuralInteractionDetectionExplainerTF():
         for layer_weight in dense_layer_weights[::-1]:
             aggregate_influence = tf.matmul(tf.abs(layer_weight), aggregate_influence)
 
-        return aggregate_influence
+        return aggregate_influence, first_layer_weight
 
     def _single_interaction(self,
                             output_index,

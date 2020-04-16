@@ -32,13 +32,19 @@ class ContextualDecompositionExplainerTF():
 
         # Bulk of the CD code is done here
         for layer in self.model.layers:
-            if isinstance(layer, tf.keras.layers.Dense):
-                layer_weight = layer.weights[0]
+            if isinstance(layer, tf.keras.layers.Dense) or \
+               hasattr(layer, 'w'):
 
-                if len(layer.weights) > 1:
-                    layer_bias   = layer.weights[1]
-                else:
+                if hasattr(layer, 'w'):
+                    layer_weight = layer.w
                     layer_bias = tf.zeros(layer_weight.shape[1])
+                else:
+                    layer_weight = layer.weights[0]
+
+                    if len(layer.weights) > 1:
+                        layer_bias   = layer.weights[1]
+                    else:
+                        layer_bias = tf.zeros(layer_weight.shape[1])
 
                 weight_beta  = tf.matmul(batch_beta, layer_weight)
                 weight_gamma = tf.matmul(batch_gamma, layer_weight)
@@ -55,7 +61,7 @@ class ContextualDecompositionExplainerTF():
                 batch_beta  = weight_beta  + bias_beta
                 batch_gamma = weight_gamma + bias_gamma
 
-                if layer.activation is not None:
+                if hasattr(layer, 'activation') and layer.activation is not None:
                     activation_beta  = layer.activation (batch_beta)
                     activation_gamma = layer.activation (batch_beta + batch_gamma) - \
                                        layer.activation (batch_beta)
@@ -70,8 +76,9 @@ class ContextualDecompositionExplainerTF():
                 batch_beta  = activation_beta
                 batch_gamma = activation_gamma
             else:
-                raise ValueError('Layer type {} '.format(type(layer)) + \
-                                 'not implemented.')
+                pass
+#                 raise ValueError('Layer type {} '.format(type(layer)) + \
+#                                  'not implemented.')
 
         if batch_output_indices is not None:
             indices = np.arange(batch_inputs.shape[0])

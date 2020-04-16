@@ -4,8 +4,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-def pulsar_dataset():
-    df = pd.read_csv('pulsar_stars.csv')
+def pulsar_dataset(dir='pulsar_stars.csv'):
+    df = pd.read_csv(dir)
 
     X = df.drop(['target_class'], axis = 1)
     y = df['target_class'].values

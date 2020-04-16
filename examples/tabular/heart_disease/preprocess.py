@@ -4,8 +4,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-def heart_dataset():
-    df = pd.read_csv('heart.csv')
+def heart_dataset(dir='heart.csv'):
+    df = pd.read_csv(dir)
 
     # Filter out values for number of major (calcified) vessels
     # 4 is a placeholder for NaN in this dataset for some reason.
