@@ -41,14 +41,14 @@ def get_data():
     y = np.concatenate([y_train, y_test], axis=0)
     return x, y
 
-def get_performance_curve(interaction_function, x, y):
+def get_performance_curve(interaction_function, x, y, best_param, interactions):
     print('Getting standard performance')
-    mean_test_auc, sd_test_auc, interactions = get_performance(x,
-                                                               y,
-                                                               random_seed=0,
-                                                               n_iter=FLAGS.n_iter,
-                                                               interactions_to_ignore=None,
-                                                               interaction_function=interaction_function)
+    mean_test_auc, sd_test_auc, = get_performance(x,
+                                                  y,
+                                                  random_seed=0,
+                                                  n_iter=None,
+                                                  interactions_to_ignore=None,
+                                                  best_param=best_param)
     interactions = np.mean(np.abs(interactions), axis=0)
     first_indices, second_indices = np.triu_indices(interactions.shape[0], k=1)
     flattened_interactions = interactions[first_indices, second_indices]
@@ -62,7 +62,7 @@ def get_performance_curve(interaction_function, x, y):
     sd_performances   = [sd_test_auc]
 
     cumulative_pairs = [(),]
-    num_removed = []
+    num_removed = [0]
     for num, pair in enumerate(zip(first_indices, second_indices)):
         print('Removing pair {}/{}'.format(num, len(first_indices)))
         cumulative_pairs.append(pair)
@@ -72,7 +72,7 @@ def get_performance_curve(interaction_function, x, y):
                                                      random_seed=0,
                                                      n_iter=FLAGS.n_iter,
                                                      interactions_to_ignore=cumulative_pairs,
-                                                     interaction_function=None)
+                                                     best_param=best_param)
         mean_performances.append(mean_test_auc)
         sd_performances.append(sd_test_auc)
 
@@ -80,6 +80,14 @@ def get_performance_curve(interaction_function, x, y):
 
 def main(argv=None):
     x, y = get_data()
+    print('Getting best hyper parameters')
+    best_param, model = get_performance(x,
+                                        y,
+                                        random_seed=0,
+                                        n_iter=FLAGS.n_iter,
+                                        interactions_to_ignore=None,
+                                        best_param=None)
+
     interaction_types = ['integrated_hessians']
 #                          'expected_hessians',
 #                          'hessians',
@@ -94,9 +102,12 @@ def main(argv=None):
     num_list  = []
     for interaction_type in interaction_types:
         print('Evaluating {}'.format(interaction_type))
+        print('Getting interactions')
         interaction_function = return_interaction_function(interaction_type)
+        interactions = interaction_function(model, x, baseline=x)
+
         mean_performances, sd_performances, cumulative_pairs, num_removed = \
-            get_performance_curve(interaction_function, x, y)
+            get_performance_curve(interaction_function, x, y, best_param, interactions)
 
         perf_list += mean_performances
         sd_list += sd_performances

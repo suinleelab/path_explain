@@ -14,7 +14,7 @@ import numpy as np
 from tqdm import tqdm
 
 class NeuralInteractionDetectionExplainerTF():
-    def __init__(self, model):
+    def __init__(self, model, ignore_untrainable=True):
         """
         Args:
             model: A tf.keras.Model instance. Assumes that
@@ -22,9 +22,9 @@ class NeuralInteractionDetectionExplainerTF():
                    first layer.
         """
         self.model = model
-        self.unit_influence, self.first_layer_weight = self._preprocess_weights()
+        self.unit_influence, self.first_layer_weight = self._preprocess_weights(ignore_untrainable=ignore_untrainable)
 
-    def _preprocess_weights(self):
+    def _preprocess_weights(self, ignore_untrainable=True):
         """
         Pre-computes the `influence` vector z^(l)
         used to weight hidden unit importances. See the
@@ -33,7 +33,10 @@ class NeuralInteractionDetectionExplainerTF():
         dense_layer_weights = []
         for layer in self.model.layers:
             if isinstance(layer, tf.keras.layers.Dense):
-                dense_layer_weights.append(layer.weights[0])
+                if not ignore_untrainable or \
+                    layer.trainable:
+                    dense_layer_weights.append(layer.weights[0])
+
         first_layer_weight = np.abs(dense_layer_weights[0])
 
         aggregate_influence = tf.abs(dense_layer_weights[-1])

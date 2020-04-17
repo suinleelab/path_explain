@@ -3,6 +3,9 @@ import os
 sys.path.append('..')
 sys.path.append('../../examples/tabular/')
 
+import tensorflow as tf
+import numpy as np
+
 from path_explain import PathExplainerTF
 from contextual_decomposition import ContextualDecompositionExplainerTF
 from gradients import GradientExplainerTF

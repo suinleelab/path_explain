@@ -1,23 +1,19 @@
 import tensorflow as tf
 import numpy as np
 
-class SelectInputs(tf.keras.layers.Layer):
-    def __init__(self, feature_indices, num_features, name=None):
-        super(SelectInputs, self).__init__(name=name)
+def get_select_layer(feature_indices, num_features, name=None):
+    if isinstance(feature_indices, int):
+        feature_indices = [feature_indices]
 
-        if isinstance(feature_indices, int):
-            feature_indices = [feature_indices]
-
-        numpy_weight = np.zeros((num_features, len(feature_indices)), dtype=np.float32)
-        numpy_weight[feature_indices, np.arange(len(feature_indices))] = 1
-        self.w = tf.Variable(initial_value=numpy_weight,
-                             trainable=False)
-
-    def get_config(self):
-        return {'activation': None}
-
-    def call(self, inputs):
-        return tf.matmul(inputs, self.w)
+    numpy_weight = np.zeros((num_features, len(feature_indices)), dtype=np.float32)
+    numpy_weight[feature_indices, np.arange(len(feature_indices))] = 1
+    layer = tf.keras.layers.Dense(units=len(feature_indices),
+                                  use_bias=False,
+                                  activation=None,
+                                  trainable=False,
+                                  name=name,
+                                  weights=[numpy_weight])
+    return layer
 
 def get_subnetwork(model, input_features):
     if (isinstance(input_features), int):
@@ -59,9 +55,11 @@ def interaction_model(num_features,
 
     main_effect_outputs = []
     for feature in range(num_features):
-        model_output = SelectInputs(feature_indices=feature,
-                                    num_features=num_features,
-                                    name='select_{}'.format(feature))(input_tensor)
+        select_layer = get_select_layer(feature_indices=feature,
+                                             num_features=num_features,
+                                             name='select_{}'.format(feature))
+        model_output = select_layer(input_tensor)
+
         for layer in range(num_layers):
             model_output = tf.keras.layers.Dense(hidden_layer_size,
                                                  activation=activation_function,
@@ -78,9 +76,11 @@ def interaction_model(num_features,
                 (i, j) in interactions_to_ignore:
                 continue
 
-            model_output = SelectInputs(feature_indices=[i, j],
-                                        num_features=num_features,
-                                        name='select_{}_{}'.format(i, j))(input_tensor)
+            select_layer = get_select_layer(feature_indices=(i, j),
+                                            num_features=num_features,
+                                            name='select_{}_{}'.format(i, j))
+            model_output = select_layer(input_tensor)
+
             for layer in range(num_layers):
                 model_output = tf.keras.layers.Dense(hidden_layer_size,
                                                      activation=activation_function,
