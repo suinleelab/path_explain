@@ -5,6 +5,7 @@ sys.path.append('../../examples/tabular/')
 
 import tensorflow as tf
 import numpy as np
+from tqdm import tqdm
 
 from path_explain import PathExplainerTF
 from contextual_decomposition import ContextualDecompositionExplainerTF
@@ -19,6 +20,7 @@ def return_interaction_function(interaction_type='integrated_hessians'):
     if interaction_type == 'integrated_hessians':
         def interaction_function(model, data, baseline=None):
             interpret_model = tf.keras.models.clone_model(model)
+            interpret_model.set_weights(model.get_weights())
 
             for layer in interpret_model.layers:
                 if layer.get_config().get('activation', None) == 'relu':
@@ -26,39 +28,40 @@ def return_interaction_function(interaction_type='integrated_hessians'):
 
             explainer = PathExplainerTF(interpret_model)
 
-            baseline = np.zeros((1, data.shape[1]))
+            baseline = np.zeros((1, data.shape[1])).astype(np.float32)
             interactions = explainer.interactions(inputs=data,
                                                   baseline=baseline,
                                                   batch_size=100,
                                                   num_samples=100,
                                                   use_expectation=False,
-                                                  output_indices=None,
-                                                  verbose=False,
+                                                  output_indices=0,
+                                                  verbose=True,
                                                   interaction_index=None)
             return interactions
     elif interaction_type == 'expected_hessians':
         def interaction_function(model, data, baseline=None):
             interpret_model = tf.keras.models.clone_model(model)
+            interpret_model.set_weights(model.get_weights())
 
             for layer in interpret_model.layers:
                 if layer.get_config().get('activation', None) == 'relu':
                     layer.activation = softplus_activation(beta=10.0)
 
             explainer = PathExplainerTF(interpret_model)
-
 
             interactions = explainer.interactions(inputs=data,
                                                   baseline=baseline,
                                                   batch_size=100,
                                                   num_samples=100,
                                                   use_expectation=True,
-                                                  output_indices=None,
-                                                  verbose=False,
+                                                  output_indices=0,
+                                                  verbose=True,
                                                   interaction_index=None)
             return interactions
     elif interaction_type == 'hessians':
         def interaction_function(model, data, baseline=None):
             interpret_model = tf.keras.models.clone_model(model)
+            interpret_model.set_weights(model.get_weights())
 
             for layer in interpret_model.layers:
                 if layer.get_config().get('activation', None) == 'relu':
@@ -69,13 +72,14 @@ def return_interaction_function(interaction_type='integrated_hessians'):
             interactions = explainer.interactions(inputs=data,
                                                   multiply_by_input=False,
                                                   batch_size=100,
-                                                  output_index=None,
-                                                  verbose=False,
+                                                  output_index=0,
+                                                  verbose=True,
                                                   interaction_index=None)
             return interactions
     elif interaction_type == 'hessians_times_inputs':
         def interaction_function(model, data, baseline=None):
             interpret_model = tf.keras.models.clone_model(model)
+            interpret_model.set_weights(model.get_weights())
 
             for layer in interpret_model.layers:
                 if layer.get_config().get('activation', None) == 'relu':
@@ -86,46 +90,40 @@ def return_interaction_function(interaction_type='integrated_hessians'):
             interactions = explainer.interactions(inputs=data,
                                                   multiply_by_input=True,
                                                   batch_size=100,
-                                                  output_index=None,
-                                                  verbose=False,
+                                                  output_index=0,
+                                                  verbose=True,
                                                   interaction_index=None)
             return interactions
     elif interaction_type == 'shapley_sampling':
         def interaction_function(model, data, baseline=None):
             explainer = SamplingExplainerTF(model)
 
-            baseline = np.zeros((1, data.shape[1]))
-            interactions = explainer.interactions(inputs,
+            baseline = np.zeros(data[0].shape).astype(np.float32)
+            interactions = explainer.interactions(inputs=data,
                                                   baselines=baseline,
                                                   batch_size=100,
-                                                  number_of_samples=200,
-                                                  output_index=None,
-                                                  verbose=False)
+                                                  number_of_samples=100,
+                                                  output_index=0,
+                                                  verbose=True)
             return interactions
     elif interaction_type == 'contextual_decomposition':
         def interaction_function(model, data, baseline=None):
-            interaction_matrix = np.zeros((data.shape[0], data.shape[1], data.shape[1]))
-            for i in range(data.shape[1]):
-                for j in range(i + 1, data.shape[1]):
-                    subnetwork = get_subnetwork(model, input_features=(i, j))
-                    explainer = ContextualDecompositionExplainerTF(subnetwork)
-                    attributions, _ = explainer.attributions(fixed_values, batch_size=100)
-                    interactions, _ = explainer.interactions(fixed_values, batch_size=100)
-                    interactions = interactions - attributions[:, np.newaxis, :] - attributions[:, :, np.newaxis]
-                    interaction_matrix += interactions
-            return interaction_matrix
+            explainer = ContextualDecompositionExplainerTF(model)
+            interactions = explainer.interactions(inputs=data,
+                                                  batch_size=100)
+            attributions, _ = explainer.attributions(data, batch_size=100)
+            interactions, _ = explainer.interactions(data, batch_size=100)
+            interactions = interactions - attributions[:, np.newaxis, :] - attributions[:, :, np.newaxis]
+
+            return interactions
     elif interaction_type == 'neural_interaction_detection':
         def interaction_function(model, data, baseline=None):
-            interaction_matrix = np.zeros((data.shape[0], data.shape[1], data.shape[1]))
+            explainer = NeuralInteractionDetectionExplainerTF(model)
+            interactions = explainer.interactions()
+            interactions = np.expand_dims(interactions, axis=0)
+            interactions = np.tile(interactions, (data.shape[0], 1, 1))
 
-            for i in range(data.shape[1]):
-                for j in range(i + 1, data.shape[1]):
-                    subnetwork = get_subnetwork(model, input_features=(i, j))
-                    explainer = NeuralInteractionDetectionExplainerTF(subnetwork)
-                    interactions = nid_explainer.interactions()
-                    interaction_matrix[:, i, j] = interactions[0, 1]
-                    interaction_matrix[:, j, i] = interactions[1, 0]
-            return interaction_matrix
+            return interactions
     else:
         raise ValueError('Unrecognized interaction type `{}`'.format(interaction_type))
 

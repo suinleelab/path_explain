@@ -16,17 +16,18 @@ def get_select_layer(feature_indices, num_features, name=None):
     return layer
 
 def get_subnetwork(model, input_features):
-    if (isinstance(input_features), int):
+    if isinstance(input_features, int):
         input_string = int(input_features)
     else:
         input_string = '{}_{}'.format(input_features[0], input_features[1])
 
-    input_tensor = model.get_layer('select_{}'.format(input_string)).input
-    subnetwork = tf.keras.models.Model(inputs=input_tensor,
-                                       outputs=model.get_layer('output_{}'.format(input_string)).output)
+    input_tensor  = tf.keras.layers.Input(shape=2)
     output_tensor = input_tensor
-    for layer in subnetwork.layers:
+    layer = model.get_layer('dense_0_{}'.format(input_string))
+    while 'concat' not in layer.name:
         output_tensor = layer(output_tensor)
+        next_layer_name = layer._outbound_nodes[0].outbound_layer.name
+        layer = model.get_layer(next_layer_name)
 
     weight_multiply_index = [layer.name.split('/')[0] for layer in \
                              model.get_layer('concat').input].index('output_{}'.format(input_string))
@@ -56,8 +57,8 @@ def interaction_model(num_features,
     main_effect_outputs = []
     for feature in range(num_features):
         select_layer = get_select_layer(feature_indices=feature,
-                                             num_features=num_features,
-                                             name='select_{}'.format(feature))
+                                        num_features=num_features,
+                                        name='select_{}'.format(feature))
         model_output = select_layer(input_tensor)
 
         for layer in range(num_layers):
