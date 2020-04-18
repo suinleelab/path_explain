@@ -50,7 +50,8 @@ def interaction_model(num_features,
                       hidden_layer_size,
                       num_outputs=1,
                       activation_function=tf.keras.activations.relu,
-                      interactions_to_ignore=None):
+                      interactions_to_ignore=None,
+                      regression=False):
     input_tensor = tf.keras.layers.Input(shape=num_features,
                                          name='input')
 
@@ -95,10 +96,14 @@ def interaction_model(num_features,
                                                    activation=None,
                                                    use_bias=False,
                                                    name='output_final')(concatenated_outputs)
-    if num_outputs == 1:
-        final_output = tf.keras.layers.Activation(tf.keras.activations.sigmoid)(weighted_model_outputs)
+
+    if regression:
+        final_output = weighted_model_outputs
     else:
-        final_output = tf.keras.layers.Activation(tf.keras.activations.softmax)(weighted_model_outputs)
+        if num_outputs == 1:
+            final_output = tf.keras.layers.Activation(tf.keras.activations.sigmoid)(weighted_model_outputs)
+        else:
+            final_output = tf.keras.layers.Activation(tf.keras.activations.softmax)(weighted_model_outputs)
 
     model = tf.keras.models.Model(inputs=input_tensor, outputs=final_output)
     return model

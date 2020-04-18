@@ -2,10 +2,14 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 
-from sklearn.model_selection import StratifiedKFold, ParameterSampler, train_test_split
+from sklearn.model_selection import KFold, StratifiedKFold, ParameterSampler, train_test_split
 from build_model import interaction_model
 
-def compile_model(model, learning_rate=0.001, regression=False):
+def compile_model(model, learning_rate=0.1, regression=False):
+    learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
+                                                                   decay_steps=1,
+                                                                   decay_rate=0.99,
+                                                                   staircase=True)
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
     if regression:
@@ -63,12 +67,8 @@ def get_interaction_model(x,
     if not regression:
         model.add(tf.keras.layers.Activation(tf.keras.activations.sigmoid))
 
-    learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=0.1,
-                                                                   decay_steps=1,
-                                                                   decay_rate=0.99,
-                                                                   staircase=True)
-    compile_model(model, regression=regression, learning_rate=learning_rate)
-    model.fit(x_train, y_train, batch_size=300, epochs=50, verbose=1)
+    compile_model(model, regression=regression, learning_rate=0.1)
+    model.fit(x_train, y_train, batch_size=300, epochs=25, verbose=0)
     model.evaluate(x_test, y_test, batch_size=300, verbose=2)
     return model
 
@@ -93,8 +93,8 @@ def get_performance(x,
                                                         stratify=stratify)
     if best_param is None:
         hyper_params = {
-            'learning_rate': np.exp(np.linspace(-1, -5, num=100)),
-            'epochs': np.arange(5, 20),
+            'learning_rate': np.exp(np.linspace(-1.5, -4, num=100)),
+            'epochs': np.arange(50, 300),
             'num_layers': [2, 3],
             'hidden_layer_size': np.arange(2, 6)
         }
@@ -105,11 +105,13 @@ def get_performance(x,
                                                x_train,
                                                y_train,
                                                random_seed=random_seed,
-                                               interactions_to_ignore=interactions_to_ignore)
+                                               interactions_to_ignore=interactions_to_ignore,
+                                               regression=regression)
         model = interaction_model(num_features=x_train.shape[1],
                                   num_layers=best_param['num_layers'],
                                   hidden_layer_size=best_param['hidden_layer_size'],
-                                  interactions_to_ignore=interactions_to_ignore)
+                                  interactions_to_ignore=interactions_to_ignore,
+                                  regression=regression)
         compile_model(model,
                       learning_rate=best_param['learning_rate'],
                       regression=regression)
@@ -121,11 +123,12 @@ def get_performance(x,
         return best_param, model
 
     test_aucs = []
-    for _ in range(5):
+    for _ in range(10):
         model = interaction_model(num_features=x_train.shape[1],
                                   num_layers=best_param['num_layers'],
                                   hidden_layer_size=best_param['hidden_layer_size'],
-                                  interactions_to_ignore=interactions_to_ignore)
+                                  interactions_to_ignore=interactions_to_ignore,
+                                  regression=regression)
         compile_model(model,
                       learning_rate=best_param['learning_rate'],
                       regression=regression)
@@ -147,19 +150,22 @@ def get_performance(x,
 
     return mean_test_auc, sd_test_auc
 
-def get_best_performing_model(hyper_params, x, y, random_seed=0, interactions_to_ignore=None):
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_seed)
+def get_best_performing_model(hyper_params, x, y, random_seed=0, interactions_to_ignore=None, regression=False):
+    if regression:
+        skf = KFold(n_splits=5, shuffle=True, random_state=random_seed)
+    else:
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_seed)
 
-    # Evaluating AUC, so random performance is 0.5
-    best_auc = 0.5
+    best_auc = None
     best_param = None
-    weight_key = x.shape[0]
+    weight_key = x.shape[0] + x.shape[1]
 
     for param in tqdm(hyper_params):
         model = interaction_model(num_features=x.shape[1],
                                   num_layers=param['num_layers'],
                                   hidden_layer_size=param['hidden_layer_size'],
-                                  interactions_to_ignore=interactions_to_ignore)
+                                  interactions_to_ignore=interactions_to_ignore,
+                                  regression=regression)
         compile_model(model,
                       learning_rate=param['learning_rate'],
                       regression=regression)
@@ -185,9 +191,14 @@ def get_best_performing_model(hyper_params, x, y, random_seed=0, interactions_to
         mean_val_auc = np.mean(mean_val_auc)
         del model
 
-        if mean_val_auc > best_auc:
-            best_auc = mean_val_auc
-            best_param = param
+        if regression:
+            if best_auc is None or mean_val_auc < best_auc:
+                best_auc = mean_val_auc
+                best_param = param
+        else:
+            if best_auc is None or mean_val_auc > best_auc:
+                best_auc = mean_val_auc
+                best_param = param
 
     return best_param
 

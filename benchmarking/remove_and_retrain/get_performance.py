@@ -20,18 +20,18 @@ from absl import app, flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('dataset', 'heart_disease',
-                    'One of `heart_disease`, `pulsar`, `simulated_5`, `simlated_10`')
+                    'One of `heart_disease`, `pulsar`, `simulated_2`, `simulated_5`, `simlated_10`')
 flags.DEFINE_string('visible_devices', '0', 'GPU to use')
 flags.DEFINE_integer('n_iter', 50, 'Number of hyper parameter settings to try')
 flags.DEFINE_string('interaction_type', 'integrated_hessians', 'type to use')
 flags.DEFINE_boolean('train_interaction_model', False, 'Set to true to train the interaction model from scratch.')
 
 def save_obj(obj, name):
-    with open('obj/'+ name + '.pkl', 'wb') as f:
+    with open(name, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def load_obj(name):
-    with open('obj/' + name + '.pkl', 'rb') as f:
+    with open(name, 'rb') as f:
         return pickle.load(f)
 
 def get_data():
@@ -41,6 +41,10 @@ def get_data():
     elif FLAGS.dataset == 'pulsar':
         x_train, y_train, x_test, y_test, _, _, _ = \
             pulsar_dataset(dir='/homes/gws/psturm/path_explain/examples/tabular/pulsar/pulsar_stars.csv')
+    elif FLAGS.dataset == 'simulated_2':
+        x = np.random.randn(500, 2).astype(np.float32)
+        y = np.prod(x, axis=1)
+        return x, y
     elif FLAGS.dataset == 'simulated_5':
         x = np.random.randn(2000, 5).astype(np.float32)
         y = 2 * x[:, 0] * x[:, 1] - \
@@ -91,7 +95,7 @@ def get_performance_curve(interaction_function, x, y, best_param, interactions):
     for num, pair in enumerate(zip(first_indices, second_indices)):
         print('Removing pair {}, {}/{}'.format(pair, num, len(first_indices)))
         cumulative_pairs.append(pair)
-        num_removed.append(num)
+        num_removed.append(num + 1)
         mean_test_auc, sd_test_auc = get_performance(x,
                                                      y,
                                                      random_seed=0,
@@ -103,7 +107,7 @@ def get_performance_curve(interaction_function, x, y, best_param, interactions):
 
     return mean_performances, sd_performances, cumulative_pairs, num_removed
 
-def train_interaction_model():
+def train_interaction_model(x, y):
     print('Getting best hyper parameters')
     best_param, _ = get_performance(x,
                                     y,
@@ -117,18 +121,18 @@ def train_interaction_model():
     set_up_environment(visible_devices=FLAGS.visible_devices)
     x, y = get_data()
     interaction_model = get_interaction_model(x, y)
-    tf.keras.models.save_model('models/{}.h5'.format(FLAGS.dataset))
+    tf.keras.models.save_model(interaction_model, 'models/{}.h5'.format(FLAGS.dataset))
 
 def load_interaction_model():
     counter = 0
     while True:
         counter += 1
         try:
-            model = tf.keras.models.load_model('models/{}.h5'.format(FLAGS.datset))
+            model = tf.keras.models.load_model('models/{}.h5'.format(FLAGS.dataset))
             best_param = load_obj('models/param_{}.pkl'.format(FLAGS.dataset))
             print('Successfully restored trained model and training parameters.')
             break
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError):
             print('({}) Did not find saved model or parameters. Will try again in 30 seconds...'.format(counter))
         sleep(30)
     return model, best_param
@@ -138,7 +142,7 @@ def main(argv=None):
     x, y = get_data()
 
     if FLAGS.train_interaction_model:
-        train_interaction_model()
+        train_interaction_model(x, y)
 
     interaction_model, best_param = load_interaction_model()
 
@@ -173,12 +177,12 @@ def main(argv=None):
     sd_list += sd_performances
     pairs_list += cumulative_pairs
     num_list += num_removed
-    type_list += [interaction_type] * len(mean_performances)
+    type_list += [FLAGS.interaction_type] * len(mean_performances)
 
     data = pd.DataFrame({
         'interaction_type': type_list,
-        'mean_auc': perf_list,
-        'sd_auc': sd_list,
+        'mean_perf': perf_list,
+        'sd_perf': sd_list,
         'cumulative_pairs': pairs_list,
         'num_interactions_removed': num_list
     })
