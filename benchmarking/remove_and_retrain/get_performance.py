@@ -8,8 +8,9 @@ import numpy as np
 import pandas as pd
 import pickle
 from time import sleep
+from sklearn.model_selection import train_test_split
 
-from utils import get_performance, get_interactions, get_interaction_model
+from utils import get_performance, get_interaction_model
 from build_model import interaction_model
 from path_explain.utils import set_up_environment, softplus_activation
 from heart_disease.preprocess import heart_dataset
@@ -22,62 +23,37 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('dataset', 'heart_disease',
                     'One of `heart_disease`, `pulsar`, `simulated_2`, `simulated_5`, `simlated_10`')
 flags.DEFINE_string('visible_devices', '0', 'GPU to use')
-flags.DEFINE_integer('n_iter', 50, 'Number of hyper parameter settings to try')
+flags.DEFINE_integer('epochs', 200, 'Number of epochs to train for')
 flags.DEFINE_string('interaction_type', 'integrated_hessians', 'type to use')
 flags.DEFINE_boolean('train_interaction_model', False, 'Set to true to train the interaction model from scratch.')
 
-def save_obj(obj, name):
-    with open(name, 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-def load_obj(name):
-    with open(name, 'rb') as f:
-        return pickle.load(f)
-
-def get_data():
-    if FLAGS.dataset == 'heart_disease':
+def get_data(dataset):
+    if dataset == 'heart_disease':
         x_train, y_train, x_test, y_test, _, _, _ = \
             heart_dataset(dir='/homes/gws/psturm/path_explain/examples/tabular/heart_disease/heart.csv')
-    elif FLAGS.dataset == 'pulsar':
+    elif dataset == 'pulsar':
         x_train, y_train, x_test, y_test, _, _, _ = \
             pulsar_dataset(dir='/homes/gws/psturm/path_explain/examples/tabular/pulsar/pulsar_stars.csv')
-    elif FLAGS.dataset == 'simulated_2':
-        x = np.random.randn(500, 2).astype(np.float32)
-        y = np.prod(x, axis=1)
-        return x, y
-    elif FLAGS.dataset == 'simulated_5':
-        x = np.random.randn(2000, 5).astype(np.float32)
-        y = 2 * x[:, 0] * x[:, 1] - \
-            x[:, 0] * x[:, 2] + \
-            1.5 * x[:, 2] * x[:, 3] + \
-            0.5 * x[:, 1] * x[:, 3] + \
-            x[:, 4]
-        return x, y
-    elif FLAGS.dataset == 'simulated_10':
-        x = np.random.randn(2000, 10).astype(np.float32)
-        y = 2 * x[:, 0] * x[:, 1] - \
-            x[:, 0] * x[:, 2] + \
-            1.5 * x[:, 2] * x[:, 3] + \
-            0.5 * x[:, 1] * x[:, 3] + \
-            3 * x[:, 6] * x[:, 7] - \
-            2 * x[:, 8] * x[:, 9] + \
-            x[:, 4] - x[:, 5]
-        return x, y
+    elif 'simulated' in dataset:
+        x = np.load('data/{}_x.npy'.format(dataset))
+        y = np.load('data/{}_y.npy'.format(dataset))
+        x_train, x_test, y_train, y_test = train_test_split(x,
+                                                            y,
+                                                            test_size=0.2,
+                                                            random_state=0)
     else:
         raise ValueError('Unrecognized value `{}` for parameter `dataset`'.format(FLAGS.dataset))
 
-    x = np.concatenate([x_train, x_test], axis=0)
-    y = np.concatenate([y_train, y_test], axis=0)
-    return x, y
+    return x_train, y_train, x_test, y_test
 
-def get_performance_curve(interaction_function, x, y, best_param, interactions):
+def get_performance_curve(x_train, y_train, x_test, y_test,
+                          best_param, interactions):
     print('Getting standard performance')
-    mean_test_auc, sd_test_auc, = get_performance(x,
-                                                  y,
-                                                  random_seed=0,
-                                                  n_iter=None,
-                                                  interactions_to_ignore=None,
-                                                  best_param=best_param)
+    mean_test_auc, sd_test_auc = get_performance(x_train, y_train, x_test, y_test,
+                                                 best_param=best_param,
+                                                 regression=('simulated' in FLAGS.dataset),
+                                                 interactions_to_ignore=None)
+
     interactions = np.mean(np.abs(interactions), axis=0)
     first_indices, second_indices = np.triu_indices(interactions.shape[0], k=1)
     flattened_interactions = interactions[first_indices, second_indices]
@@ -96,31 +72,20 @@ def get_performance_curve(interaction_function, x, y, best_param, interactions):
         print('Removing pair {}, {}/{}'.format(pair, num, len(first_indices)))
         cumulative_pairs.append(pair)
         num_removed.append(num + 1)
-        mean_test_auc, sd_test_auc = get_performance(x,
-                                                     y,
-                                                     random_seed=0,
-                                                     n_iter=FLAGS.n_iter,
-                                                     interactions_to_ignore=cumulative_pairs,
-                                                     best_param=best_param)
+        mean_test_auc, sd_test_auc = get_performance(x_train, y_train, x_test, y_test,
+                                                     best_param=best_param,
+                                                     regression=('simulated' in FLAGS.dataset),
+                                                     interactions_to_ignore=cumulative_pairs)
         mean_performances.append(mean_test_auc)
         sd_performances.append(sd_test_auc)
 
     return mean_performances, sd_performances, cumulative_pairs, num_removed
 
-def train_interaction_model(x, y):
-    print('Getting best hyper parameters')
-    best_param, _ = get_performance(x,
-                                    y,
-                                    random_seed=0,
-                                    n_iter=FLAGS.n_iter,
-                                    interactions_to_ignore=None,
-                                    best_param=None)
-    save_obj(best_param, 'models/param_{}.pkl'.format(FLAGS.dataset))
-
+def train_interaction_model(x_train, y_train, x_test, y_test):
     print('Training interaction model')
     set_up_environment(visible_devices=FLAGS.visible_devices)
-    x, y = get_data()
-    interaction_model = get_interaction_model(x, y)
+    interaction_model = get_interaction_model(x_train, y_train, x_test, y_test,
+                                              regression=('simulated' in FLAGS.dataset))
     tf.keras.models.save_model(interaction_model, 'models/{}.h5'.format(FLAGS.dataset))
 
 def load_interaction_model():
@@ -129,22 +94,27 @@ def load_interaction_model():
         counter += 1
         try:
             model = tf.keras.models.load_model('models/{}.h5'.format(FLAGS.dataset))
-            best_param = load_obj('models/param_{}.pkl'.format(FLAGS.dataset))
-            print('Successfully restored trained model and training parameters.')
+            print('Successfully restored trained model.')
             break
         except (FileNotFoundError, OSError):
-            print('({}) Did not find saved model or parameters. Will try again in 30 seconds...'.format(counter))
+            print('({}) Did not find saved model. Will try again in 30 seconds...'.format(counter))
         sleep(30)
-    return model, best_param
+    return model
 
 def main(argv=None):
     set_up_environment(visible_devices=FLAGS.visible_devices)
-    x, y = get_data()
+    x_train, y_train, x_test, y_test = get_data(FLAGS.dataset)
 
     if FLAGS.train_interaction_model:
-        train_interaction_model(x, y)
+        train_interaction_model(x_train, y_train, x_test, y_test)
 
-    interaction_model, best_param = load_interaction_model()
+    interaction_model = load_interaction_model()
+    best_param = {
+        'learning_rate': 0.005,
+        'epochs': FLAGS.epochs,
+        'num_layers': 2,
+        'hidden_layer_size': 4
+    }
 
     interaction_types = ['integrated_hessians',
                          'expected_hessians',
@@ -156,7 +126,6 @@ def main(argv=None):
     if FLAGS.interaction_type not in interaction_types:
         raise ValueError('Invalid interaction type `{}`'.format(FLAGS.interaction_type))
 
-#     for interaction_type in interaction_types:
     type_list = []
     perf_list = []
     sd_list   = []
@@ -165,13 +134,11 @@ def main(argv=None):
     print('Evaluating {}'.format(FLAGS.interaction_type))
     print('Getting interactions')
     interaction_function = return_interaction_function(FLAGS.interaction_type)
-    interactions = get_interactions(x,
-                                    y,
-                                    interaction_model,
-                                    interaction_function)
+    interactions = interaction_function(interaction_model, x_test, baseline=x_train)
 
     mean_performances, sd_performances, cumulative_pairs, num_removed = \
-        get_performance_curve(interaction_function, x, y, best_param, interactions)
+        get_performance_curve(x_train, y_train, x_test, y_test,
+                              best_param, interactions)
 
     perf_list += mean_performances
     sd_list += sd_performances

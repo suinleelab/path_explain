@@ -102,7 +102,7 @@ def return_interaction_function(interaction_type='integrated_hessians'):
             interactions = explainer.interactions(inputs=data,
                                                   baselines=baseline,
                                                   batch_size=100,
-                                                  number_of_samples=100,
+                                                  number_of_samples=None,
                                                   output_index=0,
                                                   verbose=True)
             return interactions
