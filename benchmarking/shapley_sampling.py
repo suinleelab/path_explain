@@ -138,61 +138,98 @@ class SamplingExplainerTF():
 
         return batch_attributions
 
+    def _get_discrete_derivative(self, batch_with_S, batch_baselines, batch_inputs, output_index, i, j):
+        # First we create the subset with the features in S
+        v_S = self._call_model(batch_with_S, output_index)
+
+        # Then we create the subset S u {i}
+        batch_with_S[:, i] = batch_inputs[:, i]
+        v_S_i = self._call_model(batch_with_S, output_index)
+        batch_with_S[:, i] = batch_baselines[:, i]
+
+        # Then we create the subset S u {j}
+        batch_with_S[:, j] = batch_inputs[:, j]
+        v_S_j = self._call_model(batch_with_S, output_index)
+
+        # Then we create the subset S u {i, j}
+        batch_with_S[:, i] = batch_inputs[:, i]
+        v_S_ij = self._call_model(batch_with_S, output_index)
+        batch_with_S[:, i] = batch_baselines[:, i]
+        batch_with_S[:, j] = batch_baselines[:, j]
+
+        discrete_derivative = v_S_ij - v_S_i - v_S_j + v_S
+        return discrete_derivative
+
     def _batch_interactions(self,
                             batch_inputs,
                             batch_baselines,
                             number_of_samples=None,
+                            feature_index=None,
                             output_index=None):
         num_samples = batch_inputs.shape[0]
         num_features = batch_inputs.shape[1]
-        batch_interactions = np.zeros((num_samples, num_features, num_features))
+
+        if feature_index is not None:
+            batch_interactions = np.zeros(num_samples)
+        else:
+            batch_interactions = np.zeros((num_samples, num_features, num_features))
 
         if number_of_samples is None:
-            feature_powerset = SamplingExplainerTF.powerset(range(num_features))
-            for S in feature_powerset:
-                # First we create the subset with the features in S
-                batch_with_S = batch_baselines.copy()
-                batch_with_S[:, S] = batch_inputs[:, S]
-                v_S = self._call_model(batch_with_S, output_index)
+            if feature_index is not None:
+                indices = np.arange(num_features)
+                i, j = feature_index
+                np.delete(indices, feature_index)
 
-                for i in filter(lambda x: x not in S,
-                                range(num_features)):
-                    for j in filter(lambda x: x not in S,
-                                    range(i + 1, num_features)):
-                        # Then we create the subset S u {i}
-                        batch_with_S[:, i] = batch_inputs[:, i]
-                        v_S_i = self._call_model(batch_with_S, output_index)
-                        batch_with_S[:, i] = batch_baselines[:, i]
+                feature_powerset = SamplingExplainerTF.powerset(indices)
+                for S in feature_powerset:
+                    batch_with_S = batch_baselines.copy()
+                    batch_with_S[:, S] = batch_inputs[:, S]
+                    discrete_derivative = self._get_discrete_derivative(batch_with_S, batch_baselines, batch_inputs, output_index, i, j)
 
-                        # Then we create the subset S u {j}
-                        batch_with_S[:, j] = batch_inputs[:, j]
-                        v_S_j = self._call_model(batch_with_S, output_index)
+                    # And weight them appropriately
+                    batch_interactions += discrete_derivative * \
+                        SamplingExplainerTF.weight_coeff(len(S),
+                                                         num_features,
+                                                         interaction=True)
+            else:
+                feature_powerset = SamplingExplainerTF.powerset(range(num_features))
+                for S in feature_powerset:
+                    batch_with_S = batch_baselines.copy()
+                    batch_with_S[:, S] = batch_inputs[:, S]
 
-                        # Then we create the subset S u {i, j}
-                        batch_with_S[:, i] = batch_inputs[:, i]
-                        v_S_ij = self._call_model(batch_with_S, output_index)
-                        batch_with_S[:, i] = batch_baselines[:, i]
-                        batch_with_S[:, j] = batch_baselines[:, j]
+                    for i in filter(lambda x: x not in S,
+                                    range(num_features)):
+                        for j in filter(lambda x: x not in S,
+                                        range(i + 1, num_features)):
+                            discrete_derivative = self._get_discrete_derivative(batch_with_S, batch_baselines, batch_inputs, output_index, i, j)
 
-                        discrete_derivative = v_S_ij - v_S_i - v_S_j + v_S
-
-                        # And weight them appropriately
-                        batch_interactions[:, i, j] += discrete_derivative * \
-                            SamplingExplainerTF.weight_coeff(len(S),
-                                                            num_features,
-                                                            interaction=True)
-                        batch_interactions[:, j, i] = batch_interactions[:, i, j]
+                            # And weight them appropriately
+                            batch_interactions[:, i, j] += discrete_derivative * \
+                                SamplingExplainerTF.weight_coeff(len(S),
+                                                                 num_features,
+                                                                 interaction=True)
+                            batch_interactions[:, j, i] = batch_interactions[:, i, j]
         else:
-            for i in range(num_features):
-                for j in range(i + 1, num_features):
-                    batch_importance = self._sampling_estimate(batch_inputs,
+            if feature_index is not None:
+                i, j = feature_index
+                batch_importance = self._sampling_estimate(batch_inputs,
                                                                batch_baselines,
                                                                feature_index=(i, j),
                                                                number_of_samples=number_of_samples,
                                                                output_index=output_index,
                                                                interaction=True)
-                    batch_interactions[:, i, j] = batch_importance
-                    batch_interactions[:, j, i] = batch_importance
+                return batch_importance
+            else:
+                for i in range(num_features):
+                    for j in range(i + 1, num_features):
+                        batch_importance = self._sampling_estimate(batch_inputs,
+                                                                   batch_baselines,
+                                                                   feature_index=(i, j),
+                                                                   number_of_samples=number_of_samples,
+                                                                   output_index=output_index,
+                                                                   interaction=True)
+                        batch_interactions[:, i, j] = batch_importance
+                        batch_interactions[:, j, i] = batch_importance
         return batch_interactions
 
     def attributions(self,
@@ -252,6 +289,7 @@ class SamplingExplainerTF():
                      batch_size=50,
                      number_of_samples=None,
                      output_index=None,
+                     feature_index=None,
                      verbose=False):
         """
         A function to compute interactions directly using the shapley interaction index.
@@ -273,7 +311,10 @@ class SamplingExplainerTF():
         num_inputs   = inputs.shape[0]
         num_features = inputs.shape[1]
 
-        interactions = np.zeros((num_inputs, num_features, num_features))
+        if feature_index is not None:
+            interactions = np.zeros(num_inputs)
+        else:
+            interactions = np.zeros((num_inputs, num_features, num_features))
 
         iterable = range(0, num_inputs, batch_size)
         if verbose:
@@ -293,6 +334,7 @@ class SamplingExplainerTF():
             batch_interactions = self._batch_interactions(batch_inputs,
                                                           batch_baselines,
                                                           number_of_samples=number_of_samples,
-                                                          output_index=output_index)
+                                                          output_index=output_index,
+                                                          feature_index=feature_index)
             interactions[i:i + effective_batch_size] = batch_interactions
         return interactions

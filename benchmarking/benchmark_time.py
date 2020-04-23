@@ -11,11 +11,12 @@ from contextual_decomposition import ContextualDecompositionExplainerTF
 from gradients import GradientExplainerTF
 from neural_interaction_detection import NeuralInteractionDetectionExplainerTF
 from path_explain import PathExplainerTF, softplus_activation
+from shapley_sampling import SamplingExplainerTF
 
 
 def build_model(num_features,
                 units=[128, 128],
-                activation_function=tf.keras.activations.relu,
+                activation_function=tf.keras.activations.softplus,
                 output_units=1):
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Input(shape=(num_features,)))
@@ -32,16 +33,16 @@ def get_data(num_samples,
     return x
 
 def benchmark_time():
-    number_of_layers   = np.arange(2, 6)
-    number_of_samples  = [100, 1000, 10000]
-    number_of_features = [10, 50, 100]
+    number_of_layers   = [5]
+    number_of_samples  = [1000]
+    number_of_features = [5, 50, 500]
 
     layer_array = []
     sample_array = []
     feature_array = []
 
     time_dict = {}
-    for method in ['ih', 'eh', 'cd', 'nid', 'hess', 'hess_in']:
+    for method in ['ih', 'eh', 'cd', 'nid', 'hess', 'hess_in', 'sii_sampling', 'sii_brute_force']:
         for eval_type in ['all', 'row', 'pair']:
             time_dict[method + '_' + eval_type] = []
 
@@ -53,7 +54,87 @@ def benchmark_time():
                                     activation_function=softplus_activation(beta=10.0))
                 data = get_data(sample_count, feature_count)
 
+                ###### Shapley Interaction Index Brute Force ######
+                sii_explainer = SamplingExplainerTF(model)
+                print('Shapley Interaction Index Brute Force')
+                if feature_count < 10:
+                    start_time = time.time()
+                    _ = sii_explainer.interactions(inputs=data,
+                                                   baselines=np.zeros(feature_count).astype(np.float32),
+                                                   batch_size=100,
+                                                   output_index=0,
+                                                   feature_index=None,
+                                                   number_of_samples=None,
+                                                   verbose=True)
+                    end_time = time.time()
+                    time_dict['sii_brute_force_all'].append(end_time - start_time)
+
+                    start_time = time.time()
+                    for i in tqdm(range(1, feature_count)):
+                        _ = sii_explainer.interactions(inputs=data,
+                                                       baselines=np.zeros(feature_count).astype(np.float32),
+                                                       batch_size=100,
+                                                       output_index=0,
+                                                       feature_index=(0, i),
+                                                       number_of_samples=None)
+                    end_time = time.time()
+                    time_dict['sii_brute_force_row'].append(end_time - start_time)
+
+                    start_time = time.time()
+                    _ = sii_explainer.interactions(inputs=data,
+                                                   baselines=np.zeros(feature_count).astype(np.float32),
+                                                   batch_size=100,
+                                                   output_index=0,
+                                                   feature_index=(0, 1),
+                                                   number_of_samples=None,
+                                                   verbose=True)
+                    end_time = time.time()
+                    time_dict['sii_brute_force_pair'].append(end_time - start_time)
+                else:
+                    time_dict['sii_brute_force_all'].append(np.nan)
+                    time_dict['sii_brute_force_row'].append(np.nan)
+                    time_dict['sii_brute_force_pair'].append(np.nan)
+
+                ###### Shapley Interaction Index Sampling ######
+                print('Shapley Interaction Index Sampling')
+                if feature_count < 100:
+                    start_time = time.time()
+                    _ = sii_explainer.interactions(inputs=data,
+                                                   baselines=np.zeros(feature_count).astype(np.float32),
+                                                   batch_size=100,
+                                                   output_index=0,
+                                                   feature_index=None,
+                                                   number_of_samples=200,
+                                                   verbose=True)
+                    end_time = time.time()
+                    time_dict['sii_sampling_all'].append(end_time - start_time)
+                else:
+                    time_dict['sii_sampling_all'].append(np.nan)
+
+                start_time = time.time()
+                for i in tqdm(range(1, feature_count)):
+                    _ = sii_explainer.interactions(inputs=data,
+                                                   baselines=np.zeros(feature_count).astype(np.float32),
+                                                   batch_size=100,
+                                                   output_index=0,
+                                                   feature_index=(0, i),
+                                                   number_of_samples=200)
+                end_time = time.time()
+                time_dict['sii_sampling_row'].append(end_time - start_time)
+
+                start_time = time.time()
+                _ = sii_explainer.interactions(inputs=data,
+                                               baselines=np.zeros(feature_count).astype(np.float32),
+                                               batch_size=100,
+                                               output_index=0,
+                                               feature_index=(0, 1),
+                                               number_of_samples=200,
+                                               verbose=True)
+                end_time = time.time()
+                time_dict['sii_sampling_pair'].append(end_time - start_time)
+
                 ###### Integrated and Expected Hessians ######
+                print('Integrated Hessians')
                 path_explainer  = PathExplainerTF(model)
                 start_time = time.time()
                 _ = path_explainer.interactions(inputs=data,
@@ -62,7 +143,7 @@ def benchmark_time():
                                                 num_samples=200,
                                                 use_expectation=False,
                                                 output_indices=0,
-                                                verbose=False,
+                                                verbose=True,
                                                 interaction_index=None)
                 end_time = time.time()
                 time_dict['ih_all'].append(end_time - start_time)
@@ -74,12 +155,13 @@ def benchmark_time():
                                                 num_samples=200,
                                                 use_expectation=False,
                                                 output_indices=0,
-                                                verbose=False,
+                                                verbose=True,
                                                 interaction_index=0)
                 end_time = time.time()
                 time_dict['ih_row'].append(end_time - start_time)
                 time_dict['ih_pair'].append(end_time - start_time)
 
+                print('Expected Hessians')
                 start_time = time.time()
                 _ = path_explainer.interactions(inputs=data,
                                                 baseline=np.zeros((200, feature_count)).astype(np.float32),
@@ -87,7 +169,7 @@ def benchmark_time():
                                                 num_samples=200,
                                                 use_expectation=True,
                                                 output_indices=0,
-                                                verbose=False,
+                                                verbose=True,
                                                 interaction_index=None)
                 end_time = time.time()
                 time_dict['eh_all'].append(end_time - start_time)
@@ -99,13 +181,14 @@ def benchmark_time():
                                                               num_samples=200,
                                                               use_expectation=True,
                                                               output_indices=0,
-                                                              verbose=False,
+                                                              verbose=True,
                                                               interaction_index=0)
                 end_time = time.time()
                 time_dict['eh_row'].append(end_time - start_time)
                 time_dict['eh_pair'].append(end_time - start_time)
 
                 ###### Contextual Decomposition ######
+                print('Contextual Decomposition')
                 cd_explainer = ContextualDecompositionExplainerTF(model)
                 start_time = time.time()
                 _ = cd_explainer.interactions(inputs=data,
@@ -132,10 +215,11 @@ def benchmark_time():
                 time_dict['cd_pair'].append(end_time - start_time)
 
                 ###### Neural Interaction Detection ######
+                print('Neural Interaction Detection')
                 nid_explainer = NeuralInteractionDetectionExplainerTF(model)
                 start_time = time.time()
                 _ = nid_explainer.interactions(output_index=0,
-                                               verbose=False,
+                                               verbose=True,
                                                inputs=data,
                                                batch_size=100)
                 end_time = time.time()
@@ -143,7 +227,7 @@ def benchmark_time():
 
                 start_time = time.time()
                 _ = nid_explainer.interactions(output_index=0,
-                                               verbose=False,
+                                               verbose=True,
                                                inputs=data,
                                                batch_size=100,
                                                interaction_index=0)
@@ -152,7 +236,7 @@ def benchmark_time():
 
                 start_time = time.time()
                 _ = nid_explainer.interactions(output_index=0,
-                                               verbose=False,
+                                               verbose=True,
                                                inputs=data,
                                                batch_size=100,
                                                interaction_index=(0, 1))
@@ -160,6 +244,7 @@ def benchmark_time():
                 time_dict['nid_pair'].append(end_time - start_time)
 
                 ###### Input Hessian ######
+                print('Input Hessian')
                 grad_explainer = GradientExplainerTF(model)
 
                 start_time = time.time()
@@ -209,4 +294,5 @@ def benchmark_time():
     time_df.to_csv('time.csv', index=False)
 
 if __name__ == '__main__':
+    tf.autograph.set_verbosity(0)
     benchmark_time()

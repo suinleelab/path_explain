@@ -35,12 +35,9 @@ def get_data(dataset):
         x_train, y_train, x_test, y_test, _, _, _ = \
             pulsar_dataset(dir='/homes/gws/psturm/path_explain/examples/tabular/pulsar/pulsar_stars.csv')
     elif 'simulated' in dataset:
-        x = np.load('data/{}_x.npy'.format(dataset))
-        y = np.load('data/{}_y.npy'.format(dataset))
-        x_train, x_test, y_train, y_test = train_test_split(x,
-                                                            y,
-                                                            test_size=0.2,
-                                                            random_state=0)
+        dataset = np.load('data/{}.npz'.format(dataset))
+        x_train, y_train = dataset['x_train'], dataset['y_train']
+        x_test,  y_test  = dataset['x_test'],  dataset['y_test']
     else:
         raise ValueError('Unrecognized value `{}` for parameter `dataset`'.format(FLAGS.dataset))
 
@@ -98,7 +95,7 @@ def load_interaction_model():
             break
         except (FileNotFoundError, OSError):
             print('({}) Did not find saved model. Will try again in 30 seconds...'.format(counter))
-        sleep(30)
+        sleep(60)
     return model
 
 def main(argv=None):

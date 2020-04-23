@@ -20,8 +20,7 @@ def compile_model(model, learning_rate=0.0001, regression=False):
 
 def get_interactions(x_train, x_test,
                      model,
-                     interaction_function,
-                     random_seed=0):
+                     interaction_function):
     interactions = interaction_function(model, x_test, baseline=x_train)
 
 def get_interaction_model(x_train, y_train, x_test, y_test, regression=True):
