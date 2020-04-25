@@ -1,19 +1,13 @@
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
+from data import ablate_interactions
 
-from build_model import interaction_model
-
-def compile_model(model, learning_rate=0.0001, regression=False):
+def compile_model(model, learning_rate=0.005):
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
-    if regression:
-        loss = tf.keras.losses.MeanSquaredError()
-        metrics = [tf.keras.metrics.MeanSquaredError()]
-    else:
-        loss = tf.keras.losses.BinaryCrossentropy()
-        metrics = [tf.keras.metrics.AUC()]
-
+    loss = tf.keras.losses.MeanSquaredError()
+    metrics = [tf.keras.metrics.MeanSquaredError()]
     model.compile(optimizer=optimizer,
                   loss=loss,
                   metrics=metrics)
@@ -23,45 +17,47 @@ def get_interactions(x_train, x_test,
                      interaction_function):
     interactions = interaction_function(model, x_test, baseline=x_train)
 
-def get_interaction_model(x_train, y_train, x_test, y_test, regression=True):
+def get_default_model(num_features):
     model = tf.keras.models.Sequential()
-    model.add(tf.keras.layers.Input(shape=(x_train.shape[1],)))
+    model.add(tf.keras.layers.Input(shape=(num_features,)))
+    model.add(tf.keras.layers.Dense(units=64, activation=tf.keras.activations.relu))
     model.add(tf.keras.layers.Dense(units=64, activation=tf.keras.activations.relu))
     model.add(tf.keras.layers.Dense(units=64, activation=tf.keras.activations.relu))
     model.add(tf.keras.layers.Dense(units=1,  activation=None))
-
-    if not regression:
-        model.add(tf.keras.layers.Activation(tf.keras.activations.sigmoid))
-
-    compile_model(model, regression=regression, learning_rate=0.001)
-    model.fit(x_train, y_train, batch_size=300, epochs=200, verbose=0)
-    model.evaluate(x_test, y_test, batch_size=300, verbose=2)
     return model
 
-def get_performance(x_train, y_train, x_test, y_test,
-                    best_param, regression=True,
-                    interactions_to_ignore=None):
+def get_performance(x_train,
+                    x_test,
+                    model,
+                    random_weights,
+                    spec_df,
+                    interactions_train,
+                    interactions_test,
+                    k=0,
+                    num_iters=10,
+                    batch_size=128,
+                    epochs=200):
     test_performances = []
-    for _ in range(10):
-        model = interaction_model(num_features=x_train.shape[1],
-                                  num_layers=best_param['num_layers'],
-                                  hidden_layer_size=best_param['hidden_layer_size'],
-                                  interactions_to_ignore=interactions_to_ignore,
-                                  regression=regression)
-        compile_model(model,
-                      learning_rate=best_param['learning_rate'],
-                      regression=regression)
+    for _ in tqdm(range(num_iters)):
+        y_train = ablate_interactions(x_train,
+                                      interactions_train,
+                                      spec_df,
+                                      k)
+        y_test  = ablate_interactions(x_test,
+                                      interactions_test,
+                                      spec_df,
+                                      k)
+        model.set_weights(random_weights)
         model.fit(x=x_train,
                   y=y_train,
-                  batch_size=128,
-                  epochs=best_param['epochs'],
+                  batch_size=batch_size,
+                  epochs=epochs,
                   verbose=0)
         _, test_perf = model.evaluate(x=x_test,
                                       y=y_test,
-                                      batch_size=128,
+                                      batch_size=batch_size,
                                       verbose=0)
         test_performances.append(test_perf)
-        del model
 
     mean_test_performance = np.mean(test_performances)
     sd_test_performance = np.std(test_performances)

@@ -4,15 +4,62 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+def _combine_features(first_feature, second_feature, type_name):
+    if type_name == 'multiply':
+        return first_feature * second_feature
+    elif type_name == 'maximum':
+        return np.maximum(first_feature, second_feature)
+    elif type_name == 'minimum':
+        return np.minimum(first_feature, second_feature)
+    elif type_name == 'squaresum':
+        return np.square(first_feature + second_feature)
+    else:
+        raise ValueError('Unsupported type {}'.format(type_name))
+
 def all_interaction_indices(n):
     return np.stack(np.triu_indices(n, k=1), axis=1)
+
+def ablate_interactions(x, interactions, spec_df, k):
+    x = x.copy()
+    new_y = np.zeros(x.shape[0])
+
+    first_indices, second_indices = np.triu_indices(x.shape[-1], k=1)
+    upper_triangular_interactions = interactions[:, first_indices, second_indices]
+    interaction_max_indices = np.argsort(np.abs(upper_triangular_interactions),
+                                         axis=-1)[:, ::-1][:, :k]
+    interaction_pairs = [[(first_indices[i], second_indices[i]) for i in select_index] \
+                         for select_index in interaction_max_indices]
+    for index, row in spec_df.iterrows():
+        coeff = row['coefficient']
+        type_name = row['interaction_type']
+        i  = row['first_feature']
+        j  = row['second_feature']
+        pair = (i, j)
+
+        first_feature  = x[:, pair[0]]
+        second_feature = x[:, pair[1]]
+
+        # This is the key to our remove and retrain experiments.
+        # Since the interactions are known, we can regenerate the data
+        # and ablate known interactions by redrawing from the distribution
+        mask_use_random = [pair in sample_pairs for sample_pairs in interaction_pairs]
+        mask_use_random = np.array(mask_use_random)
+
+        first_feature[mask_use_random]  = np.random.randn(np.sum(mask_use_random))
+        second_feature[mask_use_random] = np.random.randn(np.sum(mask_use_random))
+
+        interaction_value = _combine_features(first_feature,
+                                              second_feature,
+                                              type_name)
+        new_y += coeff * interaction_value
+    return new_y
 
 def generate_data(num_samples,
                   num_features,
                   num_interactions,
                   dataset_name,
                   interaction_types=['multiply', 'maximum', 'minimum', 'squaresum']):
-    x = np.random.randn(num_samples, num_features)
+    x = np.random.randn(num_samples, num_features).astype(np.float32)
 
     all_possible_indices = all_interaction_indices(num_features)
     choice_indices = np.random.choice(all_possible_indices.shape[0],
@@ -33,25 +80,25 @@ def generate_data(num_samples,
         first_feature  = x[:, pair[0]]
         second_feature = x[:, pair[1]]
 
-        if type_name == 'multiply':
-            y += coeff * first_feature * second_feature
-        elif type_name == 'maximum':
-            y += coeff * np.maximum(first_feature, second_feature)
-        elif type_name == 'minimum':
-            y += coeff * np.minimum(first_feature, second_feature)
-        elif type_name == 'squaresum':
-            y += coeff * np.square(first_feature + second_feature)
-        else:
-            raise ValueError('Unsupported type {}'.format(type_name))
+        interaction_value = _combine_features(first_feature,
+                                              second_feature,
+                                              type_name)
+        y += coeff * interaction_value
+
+    label_deviation = np.std(y)
+    relative_interaction_coefficients /= label_deviation
+    y /= label_deviation
 
     df = pd.DataFrame({
-        'feature_pairs': chosen_interaction_pairs,
-        'interaction_type': chosen_types,
+        'first_feature': chosen_interaction_pairs[:, 0],
+        'second_feature': chosen_interaction_pairs[:, 1],
+        'interaction_type': chosen_type_names,
         'coefficient': relative_interaction_coefficients
     })
 
     df.to_csv('data/{}_spec.csv'.format(dataset_name),
-              index=false)
+              index=False)
+
 
     x_train, x_test, y_train, y_test = train_test_split(x,
                                                         y,
@@ -92,6 +139,12 @@ def main(argv=None):
                   num_features=10,
                   num_interactions=20,
                   dataset_name='simulated_all',
+                  interaction_types=['multiply', 'maximum', 'minimum', 'squaresum'])
+
+    generate_data(num_samples=100,
+                  num_features=3,
+                  num_interactions=2,
+                  dataset_name='simulated_compile_test',
                   interaction_types=['multiply', 'maximum', 'minimum', 'squaresum'])
 
 if __name__ == '__main__':

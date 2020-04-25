@@ -14,8 +14,6 @@ from neural_interaction_detection import NeuralInteractionDetectionExplainerTF
 from shapley_sampling import SamplingExplainerTF
 from path_explain.utils import softplus_activation
 
-from build_model import get_subnetwork
-
 def return_interaction_function(interaction_type='integrated_hessians'):
     if interaction_type == 'integrated_hessians':
         def interaction_function(model, data, baseline=None):
