@@ -25,6 +25,7 @@ flags.DEFINE_integer('epochs', 200, 'Number of epochs to train for')
 flags.DEFINE_integer('num_iters', 10, 'Number of iterations to average over while getting performance')
 flags.DEFINE_string('interaction_type', 'integrated_hessians', 'type to use')
 flags.DEFINE_boolean('train_interaction_model', False, 'Set to true to train the interaction model from scratch.')
+flags.DEFINE_boolean('use_random_draw', False, 'Set to True to replace interactions with random guassian noise rather than the interaction distribution')
 
 def get_data(dataset_name):
     dataset = np.load('data/{}.npz'.format(dataset_name))
@@ -52,7 +53,8 @@ def get_performance_curve(x_train, x_test, model, spec_df,
                                              interactions_train=interactions_train,
                                              interactions_test=interactions_test,
                                              k=k,
-                                             num_iters=FLAGS.num_iters)
+                                             num_iters=FLAGS.num_iters,
+                                             use_random_draw=FLAGS.use_random_draw)
         mean_performances.append(mean_perf)
         sd_performances.append(sd_perf)
 
@@ -132,7 +134,10 @@ def main(argv=None):
         'sd_perf': sd_performances,
         'num_interactions_removed': num_removed
     })
-    data.to_csv('results/{}_{}.csv'.format(FLAGS.dataset, FLAGS.interaction_type))
+    if FLAGS.use_random_draw:
+        data.to_csv('results_random_draw/{}_{}.csv'.format(FLAGS.dataset, FLAGS.interaction_type))
+    else:
+        data.to_csv('results/{}_{}.csv'.format(FLAGS.dataset, FLAGS.interaction_type))
 
 if __name__ == '__main__':
     tf.autograph.set_verbosity(0)

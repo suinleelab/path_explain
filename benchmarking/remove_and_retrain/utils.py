@@ -36,17 +36,20 @@ def get_performance(x_train,
                     k=0,
                     num_iters=10,
                     batch_size=128,
-                    epochs=200):
+                    epochs=200,
+                    use_random_draw=False):
     test_performances = []
     for _ in tqdm(range(num_iters)):
         y_train = ablate_interactions(x_train,
                                       interactions_train,
                                       spec_df,
-                                      k)
+                                      k,
+                                      using_random_draw=use_random_draw)
         y_test  = ablate_interactions(x_test,
                                       interactions_test,
                                       spec_df,
-                                      k)
+                                      k,
+                                      using_random_draw=use_random_draw)
         model.set_weights(random_weights)
         model.fit(x=x_train,
                   y=y_train,

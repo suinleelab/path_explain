@@ -19,7 +19,7 @@ def _combine_features(first_feature, second_feature, type_name):
 def all_interaction_indices(n):
     return np.stack(np.triu_indices(n, k=1), axis=1)
 
-def ablate_interactions(x, interactions, spec_df, k):
+def ablate_interactions(x, interactions, spec_df, k, using_random_draw=True):
     x = x.copy()
     new_y = np.zeros(x.shape[0])
 
@@ -29,6 +29,9 @@ def ablate_interactions(x, interactions, spec_df, k):
                                          axis=-1)[:, ::-1][:, :k]
     interaction_pairs = [[(first_indices[i], second_indices[i]) for i in select_index] \
                          for select_index in interaction_max_indices]
+
+    mean_abs_coeff = np.mean(np.abs(spec_df['coefficient']))
+
     for index, row in spec_df.iterrows():
         coeff = row['coefficient']
         type_name = row['interaction_type']
@@ -45,12 +48,22 @@ def ablate_interactions(x, interactions, spec_df, k):
         mask_use_random = [pair in sample_pairs for sample_pairs in interaction_pairs]
         mask_use_random = np.array(mask_use_random)
 
-        first_feature[mask_use_random]  = np.random.randn(np.sum(mask_use_random))
-        second_feature[mask_use_random] = np.random.randn(np.sum(mask_use_random))
+        if using_random_draw:
+            interaction_value = _combine_features(first_feature,
+                                                  second_feature,
+                                                  type_name)
 
-        interaction_value = _combine_features(first_feature,
-                                              second_feature,
-                                              type_name)
+            random_draw = np.random.randn(x.shape[0])
+            interaction_value[mask_use_random] = random_draw[mask_use_random]
+            coeff = mean_abs_coeff
+        else:
+            first_feature[mask_use_random]  = np.random.randn(np.sum(mask_use_random))
+            second_feature[mask_use_random] = np.random.randn(np.sum(mask_use_random))
+
+            interaction_value = _combine_features(first_feature,
+                                                  second_feature,
+                                                  type_name)
+
         new_y += coeff * interaction_value
     return new_y
 
