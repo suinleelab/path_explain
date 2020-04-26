@@ -15,7 +15,7 @@ This repository contains tools to interpret and explain machine learning models 
 }
 ```
 
-This repository contains two important directories: the `path_explain` directory, which contains the packages used to interpret and explain machine learning models, and the `examples` directory, which contains many examples using the `path_explain` module to explain different models on different data types. 
+This repository contains two important directories: the `path_explain` directory, which contains the packages used to interpret and explain machine learning models, and the `examples` directory, which contains many examples using the `path_explain` module to explain different models on different data types.
 
 ## Installation
 
@@ -25,19 +25,19 @@ pip install path-explain
 ```
 Alternatively, you can clone this repository to re-run and explore the examples provided.
 
-## Comptability
-This package was written to support TensorFlow 2.0 (in eager execution mode) with Python 3. We have no current plans to support earlier versions of TensorFlow or Python. 
+## Compatibility
+This package was written to support TensorFlow 2.0 (in eager execution mode) with Python 3. We have no current plans to support earlier versions of TensorFlow or Python.
 
 ## API
-Although we don't yet have formal API documentation, the underlying code does a pretty good job at explaining the API. See the code for generating [attributions](https://github.com/suinleelab/path_explain/blob/master/path_explain/explainers/path_explainer_tf.py#L302) and [interactions](https://github.com/suinleelab/path_explain/blob/master/path_explain/explainers/path_explainer_tf.py#L445) to better understand what the arguments to these functions mean. 
+Although we don't yet have formal API documentation, the underlying code does a pretty good job at explaining the API. See the code for generating [attributions](https://github.com/suinleelab/path_explain/blob/master/path_explain/explainers/path_explainer_tf.py#L302) and [interactions](https://github.com/suinleelab/path_explain/blob/master/path_explain/explainers/path_explainer_tf.py#L445) to better understand what the arguments to these functions mean.
 
 ## Examples
 
-For a simple, quick example to get started using this repository, see the `example_usage.ipynb` notebook in the top-level directory of this repository. It gives an overview of the functionality provided by this repository. For more advanced examples, keep reading on. 
+For a simple, quick example to get started using this repository, see the `example_usage.ipynb` notebook in the top-level directory of this repository. It gives an overview of the functionality provided by this repository. For more advanced examples, keep reading on.
 
 ### Tabular Data using Expected Gradients and Expected Hessians
 
-Our repository can easily be adapted to explain attributions and interactions learned on tabular data. 
+Our repository can easily be adapted to explain attributions and interactions learned on tabular data.
 ```python
 # other import statements...
 from path_explain import PathExplainerTF, scatter_plot, summary_plot
@@ -102,7 +102,7 @@ As discussed in our paper, we can use Integrated Hessians to get interactions in
 from transformers import DistilBertTokenizer, TFDistilBertForSequenceClassification, \
                          DistilBertConfig, glue_convert_examples_to_features, \
                          glue_processors
-                         
+
 # This is a custom explainer to explain huggingface models
 from path_explain import EmbeddingExplainerTF, text_plot, matrix_interaction_plot, bar_interaction_plot
 
@@ -133,7 +133,7 @@ def embedding_model(batch_ids):
 def prediction_model(batch_embedding):
     # Note: this isn't exactly the right way to use the attention mask.
     # It should actually indicate which words are real words. This
-    # makes the coding easier however, and the output is fairly similar, 
+    # makes the coding easier however, and the output is fairly similar,
     # so it suffices for this tutorial.
     attention_mask = tf.ones(batch_embedding.shape[:2])
     attention_mask = tf.cast(attention_mask, dtype=tf.float32)
@@ -173,7 +173,7 @@ interactions = explainer.interactions(inputs=batch_embedding,
                                       batch_size=1,
                                       num_samples=256,
                                       use_expectation=False,
-                                      output_indices=1)        
+                                      output_indices=1)
 ###
 ```
 We can plot the learned attributions and interactions as follows. First we plot the attributions:
@@ -190,8 +190,8 @@ text_plot(batch_sentences[0],
 
 Then we plot the interactions:
 ```python
-bar_interaction_plot(interactions[0], 
-                     batch_sentences[0], 
+bar_interaction_plot(interactions[0],
+                     batch_sentences[0],
                      top_k=5)
 ```
 ![Showing feature interactions in text](/images/little_to_love_bar.png)
@@ -206,9 +206,9 @@ text_plot(batch_sentences[1],
 
 And then we show the full interaction matrix. Here we've zeroed out the diagonals so you can better see the off-diagonal terms.
 ```python
-matrix_interaction_plot(interaction_list[1], 
+matrix_interaction_plot(interaction_list[1],
                         token_list[1])
 ```
 ![Showing the full matrix of feature interactions](/images/painfully_funny_matrix.png)
 
-This example - interpreting [DistilBERT](https://arxiv.org/abs/1910.01108) - was also featured in our paper. You can examine the setup more [here](https://github.com/suinleelab/path_explain/tree/master/examples/natural_language/transformers). For more examples, see the `examples` directory in this repository. 
+This example - interpreting [DistilBERT](https://arxiv.org/abs/1910.01108) - was also featured in our paper. You can examine the setup more [here](https://github.com/suinleelab/path_explain/tree/master/examples/natural_language/transformers). For more examples, see the `examples` directory in this repository.
