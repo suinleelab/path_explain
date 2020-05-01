@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-tmux new-session -d -s simulated_all '
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type integrated_hessians --train_interaction_model;
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type expected_hessians;
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type hessians;
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type hessians_times_inputs;
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type shapley_sampling;
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type contextual_decomposition;
-python3 get_performance.py --dataset simulated_all --visible_devices 0 --use_random_draw --interaction_type neural_interaction_detection;
+tmux new-session -d -s simulated_cossum '
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type integrated_hessians --train_interaction_model;
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type expected_hessians;
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type hessians;
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type hessians_times_inputs;
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type shapley_sampling;
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type contextual_decomposition;
+python3 get_performance.py --dataset simulated_cossum --visible_devices 0 --use_random_draw --interaction_type neural_interaction_detection;
 read;
 '
 
@@ -44,13 +44,13 @@ python3 get_performance.py --dataset simulated_multiply --visible_devices 0 --us
 read;
 '
 
-tmux new-session -d -s simulated_squaresum '
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type integrated_hessians --train_interaction_model;
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type expected_hessians;
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type hessians;
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type hessians_times_inputs;
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type shapley_sampling;
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type contextual_decomposition;
-python3 get_performance.py --dataset simulated_squaresum --visible_devices 1 --use_random_draw --interaction_type neural_interaction_detection;
+tmux new-session -d -s simulated_tanhsum '
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type integrated_hessians --train_interaction_model;
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type expected_hessians;
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type hessians;
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type hessians_times_inputs;
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type shapley_sampling;
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type contextual_decomposition;
+python3 get_performance.py --dataset simulated_tanhsum --visible_devices 1 --use_random_draw --interaction_type neural_interaction_detection;
 read;
 '

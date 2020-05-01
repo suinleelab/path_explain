@@ -13,6 +13,12 @@ def _combine_features(first_feature, second_feature, type_name):
         return np.minimum(first_feature, second_feature)
     elif type_name == 'squaresum':
         return np.square(first_feature + second_feature)
+    elif type_name == 'sign_modify':
+        return first_feature * np.sign(second_feature)
+    elif type_name == 'cossum':
+        return np.cos(first_feature + second_feature)
+    elif type_name == 'tanhsum':
+        return np.tanh(first_feature + second_feature)
     else:
         raise ValueError('Unsupported type {}'.format(type_name))
 
@@ -30,7 +36,7 @@ def ablate_interactions(x, interactions, spec_df, k, using_random_draw=True):
     interaction_pairs = [[(first_indices[i], second_indices[i]) for i in select_index] \
                          for select_index in interaction_max_indices]
 
-    mean_abs_coeff = np.mean(np.abs(spec_df['coefficient']))
+    mean_abs_coeff = np.max(np.abs(spec_df['coefficient']))
 
     for index, row in spec_df.iterrows():
         coeff = row['coefficient']
@@ -52,9 +58,8 @@ def ablate_interactions(x, interactions, spec_df, k, using_random_draw=True):
             interaction_value = _combine_features(first_feature,
                                                   second_feature,
                                                   type_name)
-
             random_draw = np.random.randn(x.shape[0])
-            interaction_value[mask_use_random] = random_draw[mask_use_random]
+            interaction_value[mask_use_random] = interaction_value[mask_use_random] * random_draw[mask_use_random]
             coeff = mean_abs_coeff
         else:
             first_feature[mask_use_random]  = np.random.randn(np.sum(mask_use_random))
@@ -71,7 +76,8 @@ def generate_data(num_samples,
                   num_features,
                   num_interactions,
                   dataset_name,
-                  interaction_types=['multiply', 'maximum', 'minimum', 'squaresum']):
+                  interaction_types=['multiply', 'maximum', 'minimum', 'squaresum'],
+                  equal_coeffs=False):
     x = np.random.randn(num_samples, num_features).astype(np.float32)
 
     all_possible_indices = all_interaction_indices(num_features)
@@ -83,7 +89,11 @@ def generate_data(num_samples,
                                     size=num_interactions,
                                     replace=True)
     chosen_type_names = [interaction_types[i] for i in chosen_types]
-    relative_interaction_coefficients = np.random.randn(num_interactions)
+    if equal_coeffs:
+        relative_interaction_coefficients = np.full(shape=num_interactions,
+                                                    fill_value=1.0)
+    else:
+        relative_interaction_coefficients = np.random.randn(num_interactions)
 
     y = np.zeros(num_samples)
     for i, pair in enumerate(chosen_interaction_pairs):
@@ -124,41 +134,40 @@ def generate_data(num_samples,
              y_test=y_test)
 
 def main(argv=None):
-    generate_data(num_samples=4000,
-                  num_features=10,
-                  num_interactions=20,
+    num_samples = 5000
+    num_features = 10
+    num_interactions = 20
+
+    generate_data(num_samples=num_samples,
+                  num_features=num_features,
+                  num_interactions=num_interactions,
                   dataset_name='simulated_multiply',
                   interaction_types=['multiply'])
 
-    generate_data(num_samples=4000,
-                  num_features=10,
-                  num_interactions=20,
+    generate_data(num_samples=num_samples,
+                  num_features=num_features,
+                  num_interactions=num_interactions,
                   dataset_name='simulated_maximum',
                   interaction_types=['maximum'])
 
-    generate_data(num_samples=4000,
-                  num_features=10,
-                  num_interactions=20,
+    generate_data(num_samples=num_samples,
+                  num_features=num_features,
+                  num_interactions=num_interactions,
                   dataset_name='simulated_minimum',
                   interaction_types=['minimum'])
 
-    generate_data(num_samples=4000,
-                  num_features=10,
-                  num_interactions=20,
-                  dataset_name='simulated_squaresum',
-                  interaction_types=['squaresum'])
+    generate_data(num_samples=num_samples,
+                  num_features=num_features,
+                  num_interactions=num_interactions,
+                  dataset_name='simulated_cossum',
+                  interaction_types=['cossum'])
 
-    generate_data(num_samples=4000,
-                  num_features=10,
-                  num_interactions=20,
-                  dataset_name='simulated_all',
-                  interaction_types=['multiply', 'maximum', 'minimum', 'squaresum'])
+    generate_data(num_samples=num_samples,
+                  num_features=num_features,
+                  num_interactions=num_interactions,
+                  dataset_name='simulated_tanhsum',
+                  interaction_types=['tanhsum'])
 
-    generate_data(num_samples=100,
-                  num_features=3,
-                  num_interactions=2,
-                  dataset_name='simulated_compile_test',
-                  interaction_types=['multiply', 'maximum', 'minimum', 'squaresum'])
 
 if __name__ == '__main__':
     main()

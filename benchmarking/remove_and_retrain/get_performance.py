@@ -22,7 +22,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('dataset', 'simulated_compile_test', 'See data directory for results')
 flags.DEFINE_string('visible_devices', '0', 'GPU to use')
 flags.DEFINE_integer('epochs', 200, 'Number of epochs to train for')
-flags.DEFINE_integer('num_iters', 10, 'Number of iterations to average over while getting performance')
+flags.DEFINE_integer('num_iters', 25, 'Number of iterations to average over while getting performance')
 flags.DEFINE_string('interaction_type', 'integrated_hessians', 'type to use')
 flags.DEFINE_boolean('train_interaction_model', False, 'Set to true to train the interaction model from scratch.')
 flags.DEFINE_boolean('use_random_draw', False, 'Set to True to replace interactions with random guassian noise rather than the interaction distribution')
@@ -66,11 +66,16 @@ def train_interaction_model(x_train, y_train, x_test, y_test):
     compile_model(model)
     tf.keras.models.save_model(model, 'models/{}_random.h5'.format(FLAGS.dataset))
 
+    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                patience=5,
+                                                mode='min')
     model.fit(x=x_train,
               y=y_train,
               batch_size=128,
-              epochs=200,
-              verbose=0)
+              epochs=FLAGS.epochs,
+              verbose=0,
+              validation_split=0.2,
+              callbacks=[callback])
     tf.keras.models.save_model(model, 'models/{}.h5'.format(FLAGS.dataset))
 
 def load_interaction_model():
@@ -97,7 +102,6 @@ def main(argv=None):
         train_interaction_model(x_train, y_train, x_test, y_test)
 
     model, random_weights = load_interaction_model()
-
 
     interaction_types = ['integrated_hessians',
                          'expected_hessians',

@@ -34,10 +34,11 @@ def get_performance(x_train,
                     interactions_train,
                     interactions_test,
                     k=0,
-                    num_iters=10,
+                    num_iters=25,
                     batch_size=128,
                     epochs=200,
                     use_random_draw=False):
+
     test_performances = []
     for _ in tqdm(range(num_iters)):
         y_train = ablate_interactions(x_train,
@@ -51,11 +52,17 @@ def get_performance(x_train,
                                       k,
                                       using_random_draw=use_random_draw)
         model.set_weights(random_weights)
+
+        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                    patience=5,
+                                                    mode='min')
         model.fit(x=x_train,
                   y=y_train,
                   batch_size=batch_size,
                   epochs=epochs,
-                  verbose=0)
+                  verbose=0,
+                  validation_split=0.2,
+                  callbacks=[callback])
         _, test_perf = model.evaluate(x=x_test,
                                       y=y_test,
                                       batch_size=batch_size,
