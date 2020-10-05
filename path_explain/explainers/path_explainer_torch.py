@@ -243,7 +243,8 @@ class PathExplainerTorch(object):
             
             particular_slice = samples_input[:,i]
             ig_tensor[:,i,:] = self.attributions(particular_slice, baseline,
-                                                 num_samples=inner_loop_nsamples, use_expectation=use_expectation)
+                                                 num_samples=inner_loop_nsamples, use_expectation=use_expectation,
+                                                 output_indices=output_indices)
             
             if interaction_index is not None:
                 second_grads = grad(
