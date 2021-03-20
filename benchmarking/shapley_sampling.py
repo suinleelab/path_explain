@@ -133,8 +133,8 @@ class SamplingExplainerTF():
                                                            batch_baselines,
                                                            feature_index,
                                                            number_of_samples,
-                                                           output_index=None)
-                batch_attributions[:, feature_index] = batch_importance
+                                                           output_index=output_index)
+                batch_attributions[:, feature_index] = np.squeeze(batch_importance)
 
         return batch_attributions
 

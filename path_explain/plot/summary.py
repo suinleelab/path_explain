@@ -118,7 +118,7 @@ def summary_plot(attributions,
                                                                 axis=0,
                                                                 keepdims=True))
         standardized_feature_values = standardized_feature_values / \
-                                      (np.std(standardized_feature_values,
+                                      (np.std(feature_values,
                                               axis=0,
                                               keepdims=True) + 1e7)
     else:
