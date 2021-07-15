@@ -4,7 +4,7 @@ models through an embedding layer.
 """
 import tensorflow as tf
 import numpy as np
-from path_explain.path_explainer_tf import PathExplainerTF
+from .path_explainer_tf import PathExplainerTF
 
 class EmbeddingExplainerTF(PathExplainerTF):
     """
