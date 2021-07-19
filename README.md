@@ -5,13 +5,15 @@ A repository for explaining feature importances and feature interactions in deep
 This repository contains tools to interpret and explain machine learning models using [Integrated Gradients](https://arxiv.org/abs/1703.01365) and [Expected Gradients](https://arxiv.org/abs/1906.10670). In addition, it contains code to explain _interactions_ in deep networks using Integrated Hessians and Expected Hessians - methods that we introduced in our most recent paper: "Explaining Explanations: Axiomatic Feature Interactions for Deep Networks" (https://arxiv.org/abs/2002.04138). If you use our work to explain your networks, please cite this paper.
 
 ```
-@misc{janizek2020explaining,
-    title={Explaining Explanations: Axiomatic Feature Interactions for Deep Networks},
-    author={Joseph D. Janizek and Pascal Sturmfels and Su-In Lee},
-    year={2020},
-    eprint={2002.04138},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG}
+@article{janizek2020explaining,
+  author  = {Joseph D. Janizek and Pascal Sturmfels and Su-In Lee},
+  title   = {Explaining Explanations: Axiomatic Feature Interactions for Deep Networks},
+  journal = {Journal of Machine Learning Research},
+  year    = {2021},
+  volume  = {22},
+  number  = {104},
+  pages   = {1-54},
+  url     = {http://jmlr.org/papers/v22/20-1223.html}
 }
 ```
 
