@@ -99,8 +99,8 @@ class PathExplainerTorch(object):
             reps[0] = batch_size
             reference_tensor = baseline.repeat(list(reps)).unsqueeze(1)
 #             reference_tensor = torch.as_tensor(sampled_baseline).unsqueeze(1).to(baseline.device)
-            scaled_inputs = [reference_tensor + (float(i)/num_samples)*(input_expand - reference_tensor) \
-                             for i in range(0,num_samples+1)]
+            scaled_inputs = [reference_tensor + (float(i)/(num_samples-1))*(input_expand - reference_tensor) \
+                             for i in range(0,num_samples)]
             samples_input = torch.cat(scaled_inputs,dim=1)
         
         samples_delta = self._get_samples_delta(input_tensor, reference_tensor)
