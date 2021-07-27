@@ -251,7 +251,7 @@ class PathExplainerTorch(object):
                         outputs=ig_tensor[:,i,interaction_index],
                         inputs=particular_slice,
                         grad_outputs=torch.ones_like(ig_tensor[:,i,interaction_index]),
-                        create_graph=True)[0]
+                        create_graph=True)[0].detach()
                 interaction_mult_tensor[:,i,:] = second_grads
 
             else:
@@ -260,7 +260,7 @@ class PathExplainerTorch(object):
                         outputs=ig_tensor[:,i,feature],
                         inputs=particular_slice,
                         grad_outputs=torch.ones_like(ig_tensor[:,i,feature]),
-                        create_graph=True)[0]
+                        create_graph=True)[0].detach()
                     interaction_mult_tensor[:,i,feature,:] = second_grads
 
         interaction_mult_tensor = interaction_mult_tensor.to(samples_delta.device)
