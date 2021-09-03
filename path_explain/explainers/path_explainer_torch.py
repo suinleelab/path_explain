@@ -191,8 +191,35 @@ class PathExplainerTorch(object):
                      output_indices=None, interaction_index=None,
                      verbose=True):
         """
-        samples_input: A tensor of shape (batch, k, features)
-        ig_tensor: also size (batch, k, features), but contains IG values
+            input_tensor (torch.Tensor): Pytorch tensor representing the input
+                to be explained.
+            baseline (torch.Tensor): Pytorch tensor representing the baseline.
+                If use_expectation is true, then baseline should be shape
+                (num_refs, ...) where ... indicates the dimensionality
+                of the input. Otherwise, baseline should be shape (1, ...)
+            num_samples: The number of samples to use when computing the
+                         expectation or integral.
+            use_expectation: If True, this samples baselines and interpolation
+                             constants uniformly at random (expected gradients).
+                             If False, then this assumes num_refs=1 in which
+                             case it uses the same baseline for all inputs,
+                             or num_refs=batch_size, in which case it uses
+                             baseline[i] for inputs[i] and takes 100 linearly spaced
+                             points between baseline and input (integrated gradients).
+            output_indices:  If this is None, then this function returns the
+                             attributions for each output class. This is rarely
+                             what you want for classification tasks. Pass an
+                             integer tensor of shape [batch_size] to
+                             index the output output_indices[i] for
+                             the input inputs[i].
+            interaction_index: Either None or an index into the input. If the latter,
+                               will compute the interactions with respect to that
+                               feature. This parameter should index into a batch
+                               of inputs as inputs[(slice(None) + interaction_index)].
+                               For example, if you had images of shape (32, 32, 3)
+                               and you wanted interactions with respect
+                               to pixel (i, j, c), you should pass
+                               interaction_index=[i, j, c].
         
         """
         
