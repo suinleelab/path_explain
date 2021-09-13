@@ -256,10 +256,7 @@ class PathExplainerTorch(object):
             
         ig_tensor = torch.zeros(samples_input.shape).float()
         
-        if use_expectation:
-            loop_num = inner_loop_nsamples
-        else:
-            loop_num = inner_loop_nsamples + 1
+        loop_num = inner_loop_nsamples
         
         if verbose:
             iterable = tqdm(range(loop_num))
